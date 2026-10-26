@@ -224,6 +224,8 @@ textarea:focus{border-color:#8eae7b;box-shadow:0 0 0 3px #8eae7b20;background:#f
 
 
 .lab-picker a.lab-pick,.lab-home-brand,.all-labs,.cs-back{text-decoration:none}.lab-home-brand{color:inherit}.cs-coming-soon{text-align:center}.cs-soon-badge{display:inline-block;background:#e1e5db;color:#76816c;border:1px solid #cdd3c5;border-radius:30px;padding:8px 14px;font-size:12px;margin:12px 0 20px}.cs-back{display:inline-flex;align-items:center;margin-top:6px}.cs-back:focus-visible{outline:3px solid #93b766;outline-offset:4px}
+
+.brand-icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}.brand-icon svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:1.25}.mobile-brand .brand-icon{width:29px;height:29px;border-radius:9px;margin-right:7px}.mobile-brand .brand-icon svg{width:24px;height:24px}@media(max-width:760px){.mobile-brand{display:inline-flex;align-items:center}}
 </style></head><body><div id="app"></div><script>/* Original learning and practice content. Topic structure: OCR Physics A H556.
    The initial bank introduces each topic; it is not an exhaustive specification course. */
 const MODULES=[
@@ -1122,7 +1124,8 @@ for(const t of TOPICS)for(const q of t.questions){
 
 function chooseQuestionVersion(skill){
  progress.variantBags||={};progress.variantLast||={};
- const last=progress.variantLast[skill.id];let variant;
+ const key=skill.variantKey||skill.id;
+ const last=progress.variantLast[key];let variant;
  if(skill.make){
   for(let attempt=0;attempt<32;attempt++){
    let seed=1+Math.floor(Math.random()*2147483646);
@@ -1131,16 +1134,116 @@ function chooseQuestionVersion(skill){
    if(variant.prompt!==last)break;
   }
  }else if(skill.versions){
-  let bag=progress.variantBags[skill.id];
+  let bag=progress.variantBags[key];
   if(!Array.isArray(bag)||!bag.length||bag.some(i=>!Number.isInteger(i)||!skill.versions[i])){
    bag=shuffle(skill.versions.map((_,i)=>i));
    if(bag.length>1&&skill.versions[bag[0]].prompt===last)[bag[0],bag[1]]=[bag[1],bag[0]];
-   progress.variantBags[skill.id]=bag;
+   progress.variantBags[key]=bag;
   }
   variant=skill.versions[bag.shift()];
  }else variant=skill;
- progress.variantLast[skill.id]=variant.prompt;return variant;
+ progress.variantLast[key]=variant.prompt;return variant;
 }
+const NEW_RECALL={
+planning:[
+['Which variable does an experimenter deliberately change?','Independent variable','Dependent variable','Control variable','Random error','The independent variable is deliberately changed to investigate its effect.'],
+['What can repeat readings help identify?','The spread caused by random variation','A guaranteed true value','A new SI base unit','The exact size of every systematic error','Repeats reveal scatter and help estimate random uncertainty.']],
+analysis:[
+['What should a best-fit line represent?','The overall trend of the data','A join between every adjacent point','Only the highest reading','Only the origin','A best-fit line represents the overall relationship, allowing for scatter.'],
+['Which error persists when readings are averaged?','A consistent calibration offset','Random fluctuations only','Independent timing scatter only','Unpredictable noise only','A shared systematic offset does not cancel when results are averaged.']],
+units:[
+['Which pair contains only SI base units?','Kilogram and kelvin','Newton and joule','Volt and ampere','Pascal and metre','Kilogram and kelvin are base units; newtons, joules, volts and pascals are derived.'],
+['What does the prefix micro mean?','One millionth','One thousandth','One thousand','One million','Micro represents one millionth of the base unit.']],
+uncertainty:[
+['What does a stated absolute uncertainty describe?','An estimated range around a measured value','The exact error in every reading','The number of readings taken','The instrument’s mass','Uncertainty describes an estimated range, rather than a known exact error.'],
+['Why does squaring a measured quantity increase its percentage uncertainty?','Its fractional variation has a greater effect on the result','Its unit disappears','Its true value becomes certain','Random errors become systematic','A power amplifies the fractional effect of uncertainty in the measured quantity.']],
+vectors:[
+['Which feature distinguishes velocity from speed?','Velocity includes direction','Velocity has no magnitude','Speed is always negative','Speed is measured in newtons','Velocity is a vector, while speed is a scalar.'],
+['What are the resolved components of a force?','Perpendicular forces with the same combined effect','Extra forces added to the original','Two copies of the original force','Forces that must have equal magnitudes','Components replace the original force in the chosen perpendicular directions.']],
+motion:[
+['On a displacement-time graph, a horizontal section means the object is…','Stationary','Moving at constant nonzero speed','Accelerating upwards','Moving backwards necessarily','Constant displacement means zero velocity.'],
+['What does negative acceleration mean?','Acceleration points in the chosen negative direction','The object must be slowing down','The speed must be negative','The object cannot be moving','The sign indicates direction; an object can speed up under negative acceleration if it is moving in that direction.']],
+forces:[
+['Which distance is used when calculating a force’s moment?','The perpendicular distance from pivot to line of action','Any distance from the pivot','The object’s total length','The distance travelled by the pivot','Moment depends on perpendicular distance to the force’s line of action.'],
+['Why does a falling object approach terminal speed?','Increasing drag reduces the downward resultant force','Its weight steadily disappears','Its mass becomes zero','Gravity reverses direction','As speed rises, drag rises until it balances weight.']],
+energy:[
+['Which change increases kinetic energy if speed stays fixed?','Increasing mass','Decreasing mass','Changing direction only','Changing the zero of potential energy','At fixed speed, kinetic energy is directly proportional to mass.'],
+['What does a device’s power rating describe?','Its rate of energy transfer','Its total lifetime energy','Its stored charge','Its efficiency in every situation','Power is energy transferred per unit time.']],
+materials:[
+['Which measurement is needed to find tensile strain?','Original length and extension','Force and cross-sectional area only','Mass and acceleration','Density and volume only','Strain compares extension with original length.'],
+['What does a larger Young modulus indicate?','More stress is needed for the same small strain','The material must stretch more under the same stress','The material has no elastic region','The material must be denser','A larger Young modulus means greater stiffness in tensile deformation.']],
+momentum:[
+['What must be negligible for total momentum to be conserved in a collision?','The resultant external impulse','All internal interaction forces','The objects’ masses','Every change in kinetic energy','Internal forces exchange momentum; external impulse changes the system’s total momentum.'],
+['If an object reverses direction, what must you do when finding momentum change?','Assign opposite signs to the two velocities','Use both speeds as positive velocities','Ignore the final velocity','Subtract the masses','Momentum is a vector, so a reversal must be represented with consistent signs.']],
+current:[
+['What is moving through a metal wire when current flows?','Conduction electrons','Protons moving through the lattice','Whole metal atoms drifting rapidly','Photons carrying all the charge','Mobile conduction electrons carry charge through a metal.'],
+['Why is conventional current opposite to electron drift?','Current direction is defined for positive-charge flow','Electrons have positive charge','The metal’s atoms move backwards','Current has no defined direction','Negative electrons move opposite to the direction assigned to positive charge.']],
+resistance:[
+['What does potential difference measure?','Energy transferred per unit charge','Charge transferred per unit time','Force per unit mass','Energy transferred per unit mass','Potential difference compares energy transfer with the charge passing through a component.'],
+['For the same material and temperature, why does a thicker wire have lower resistance?','It provides a larger cross-sectional area for charge flow','Its electrons lose their charge','Its length must be zero','It cannot transfer thermal energy','Greater cross-sectional area permits more current at the same potential difference.']],
+circuits:[
+['What is the same across all branches connected directly in parallel?','Potential difference','Current in every branch','Resistance in every branch','Power in every branch','Parallel branches connect between the same two circuit points.'],
+['Why is terminal potential difference lower than emf when a cell supplies current?','Some energy per coulomb is transferred inside the cell','Charge disappears inside the cell','External resistance is always zero','The cell’s emf must become negative','Internal resistance dissipates energy, reducing the energy per coulomb available externally.']],
+waves:[
+['What happens to frequency when light crosses a boundary into glass?','It stays the same','It always increases','It always decreases','It becomes zero','The source fixes frequency; wave speed and wavelength change in the new medium.'],
+['At a node of a stationary wave, the displacement amplitude is…','Zero','Maximum','The same as at an antinode','Continuously increasing','Destructive interference produces nodes with no oscillation displacement.']],
+quantum:[
+['Why can brighter light increase photoelectric current above threshold?','More photons can release more electrons each second','Each photon necessarily gains energy','The work function disappears','The electron charge increases','At fixed frequency, greater intensity means more incident photons per second.'],
+['What happens below the threshold frequency in the single-photon photoelectric model?','No electrons are emitted even if intensity increases','Electrons always escape after waiting','Photons accumulate their energy in one electron indefinitely','The metal’s work function becomes zero','Each photon must individually provide enough energy to overcome the work function.']],
+thermal:[
+['Why must absolute temperature be used in ideal-gas calculations?','Gas pressure relates to molecular energy on the kelvin scale','Celsius is not a temperature unit','Kelvin changes the number of molecules','Temperature differences cannot be measured in Celsius','The gas laws use temperature measured from absolute zero.'],
+['What does r.m.s. molecular speed describe?','The square root of the mean squared molecular speed','The net velocity of all molecules','The speed of every molecule individually','The speed of the container','Gas molecules have a distribution of speeds; r.m.s. speed summarises the mean squared speed.']],
+circular:[
+['Why is an object accelerating in uniform circular motion?','Its velocity direction changes','Its speed must increase','Its mass changes','No resultant force acts','Acceleration is a change in velocity, including a change of direction.'],
+['Centripetal force is best described as…','The inward resultant of the real forces','An additional outward force','A force that always acts along velocity','A new force added separately to gravity','Existing interactions such as tension or gravity provide the inward resultant.']],
+oscillations:[
+['In SHM, where does the restoring acceleration point?','Towards equilibrium','Away from equilibrium','Always along the velocity','Always vertically upwards','Restoring acceleration opposes displacement from equilibrium.'],
+['Where is speed greatest in undamped SHM?','At equilibrium','At either extreme','Everywhere equally','Only outside the allowed amplitude','At equilibrium, potential energy is lowest and kinetic energy is greatest.']],
+gravity:[
+['Why are gravitational field lines around an isolated planet directed inward?','Gravitational force on a test mass is attractive','Test masses have negative mass','The planet repels nearby matter','The field exists only at infinity','Gravitational field direction follows the attractive force on a small test mass.'],
+['What does zero gravitational potential at infinity mean?','Infinity is chosen as the reference for potential energy per unit mass','The field must vanish everywhere','A planet has no gravitational energy','All finite potentials are positive','Potential is measured relative to a chosen reference; bound finite positions then have negative potential.']],
+astro:[
+['What is a star’s luminosity?','Its total energy output per second','Its brightness at Earth only','Its surface area only','Its distance from Earth','Luminosity is the star’s intrinsic total radiated power.'],
+['Why does a nearer star generally have a larger annual parallax?','Its apparent direction changes more as Earth orbits','It necessarily emits more light','Its mass must be smaller','Earth’s orbit is larger for that star','Nearby objects show a larger apparent angular shift against distant background stars.']],
+capacitors:[
+['What is capacitance a measure of?','Charge stored per unit potential difference','Current per unit resistance','Energy per unit mass','Potential difference per unit time','Capacitance describes how much charge is stored for a given potential difference.'],
+['During capacitor discharge through a resistor, where is stored energy transferred?','To thermal energy in the resistor','Into newly created charge','Only into the capacitor’s mass','Nowhere; it stays stored unchanged','The discharge current dissipates the capacitor’s stored electrical energy in the resistor.']],
+electric:[
+['Electric field direction is defined using which test charge?','A small positive test charge','A negative electron only','An uncharged particle','An arbitrarily large charge','A small positive test charge defines direction while minimally disturbing the source field.'],
+['Why are field lines between large parallel plates approximately equally spaced away from edges?','The field strength is approximately uniform','The potential is zero at every point','The plates have no charge','The force on every particle is zero','Equal line spacing represents approximately constant field strength.']],
+magnetic:[
+['What is the magnetic force on a stationary charged particle?','Zero','Always maximum','Always along the field','Always away from the magnet','A magnetic field acts on a point charge through its motion; a stationary charge has no magnetic force.'],
+['Why does magnetic deflection alone leave a particle’s kinetic energy unchanged?','Magnetic force is perpendicular to its velocity','The particle has no mass','The magnetic force is always zero','Its charge is destroyed','A perpendicular force changes direction without doing work on the particle.']],
+nuclear:[
+['Why can you predict a sample’s decay rate but not the exact decay time of one nucleus?','Individual decay is random but large populations have statistical behaviour','Every nucleus decays at a fixed age','All nuclei decay together','Decay happens only when observed','Radioactive decay is random for a single nucleus but predictable statistically for many nuclei.'],
+['During beta-minus decay, which change occurs inside the nucleus?','A neutron becomes a proton','A proton becomes a neutron','Two neutrons become an alpha particle','The nucleon number increases','Beta-minus decay converts a neutron to a proton and emits an electron and electron antineutrino.']],
+medical:[
+['Why must the measured ultrasound echo time account for two journeys?','The pulse travels to the boundary and back','Two probes always fire together','Sound has two different frequencies','The pulse stops permanently at the boundary','Echo time includes both outward travel and the return to the detector.'],
+['What does ultrasound coupling gel remove from the probe-skin interface?','An air gap that would cause strong reflection','All tissue boundaries','All sound attenuation','The patient’s electric charge','Gel reduces the impedance mismatch caused by air and improves transmission into tissue.']]
+};
+for(const [topic,rows]of Object.entries(NEW_RECALL))rows.forEach((row,i)=>{
+ addVersion(topic+'-'+i,row);
+ const q=findTopic(topic).questions[i];q.versions.at(-1).retrieval=true;
+});
+const RETRIEVAL_BASE={
+ planning:[0,1,2,3],analysis:[0,1,2,3],units:[0,2,3],uncertainty:[3],vectors:[0,3],motion:[0,2],
+ forces:[1,3],energy:[3],materials:[0,1,3],momentum:[0,2,3],current:[1,2,3],resistance:[1,3],
+ circuits:[],waves:[0,2],quantum:[0,1,2,3],thermal:[2],circular:[0,3],oscillations:[0,1,2],
+ gravity:[1,2],astro:[3],capacitors:[],electric:[0,3],magnetic:[0,1,2],nuclear:[1,2,3],medical:[1,2]
+};
+for(const [topic,indices]of Object.entries(RETRIEVAL_BASE))for(const index of indices){
+ for(const v of findTopic(topic).questions[index].versions)v.retrieval=true;
+}
+for(const t of TOPICS)for(const q of t.questions){
+ if(!q.make&&!q.type&&!/-[0-3]$/.test(q.id)&&!['circuits-loop-energy','nuclear-alpha'].includes(q.id))
+  q.versions.forEach(v=>v.retrieval=true);
+}
+findTopic('forces').questions[2].versions[0].retrieval=true;
+findTopic('medical').questions[0].versions[0].retrieval=true;
+findTopic('capacitors').questions[1].versions.slice(0,2).forEach(v=>v.retrieval=true);
+findTopic('circuits').questions.find(q=>q.id==='circuits-loop-energy').versions[1].retrieval=true;
+
+
 /* Small synthesized earcons: no downloads, autoplay or external audio files. */
 const Sound=(()=>{
  const key='physics-lab-audio-v1';
@@ -1251,7 +1354,8 @@ const Sound=(()=>{
 function isTyped(q){return q.type==='definition'||q.type==='gap';}
 function questionsFor(t,kind=mode){
  const mcq=t.questions.filter(q=>!isTyped(q));
- if(kind==='rush')return mcq;
+ if(kind==='suika'||(kind==='rush'&&rushVariant==='suika'))return mcq;
+ if(kind==='rush')return mcq.flatMap(q=>{const versions=(q.versions||[q]).filter(v=>v.retrieval);return versions.length?[{...q,versions,variantKey:q.id+'-retrieval',make:undefined,retrieval:true}]:[];});
  const written=t.questions.filter(isTyped),mixed=[];
  mcq.forEach((q,i)=>{mixed.push(q);if((i+1)%3===0&&written.length)mixed.push(written.shift());});
  return mixed.concat(written);
@@ -1818,8 +1922,8 @@ function drawFruit(ctx,level,x,y,r,angle=0,alpha=1){
 let rushVariant='normal';
 function rushControls(){
  const normal=rushVariant==='normal';
- let html='<div class="rush-switch" role="tablist" aria-label="Question Rush mode"><button type="button" role="tab" data-rush-variant="normal" aria-selected="'+normal+'" class="'+(normal?'active':'')+'">Normal <span>Timed questions</span></button><button type="button" role="tab" data-rush-variant="suika" aria-selected="'+!normal+'" class="'+(!normal?'active':'')+'">Suika mode <span>Answer · drop · merge</span></button></div>';
- if(normal)return html+'<div class="settings"><strong>Your rush</strong><label>Time limit <select id="duration"><option value="60" '+(duration===60?'selected':'')+'>1 minute</option><option value="120" '+(duration===120?'selected':'')+'>2 minutes</option><option value="180" '+(duration===180?'selected':'')+'>3 minutes</option></select></label><span class="hint">No repeated questions within a rush · Timer keeps running during feedback</span></div>';
+ let html='<div class="rush-switch" role="tablist" aria-label="Question Rush mode"><button type="button" role="tab" data-rush-variant="normal" aria-selected="'+normal+'" class="'+(normal?'active':'')+'">Normal <span>Knowledge only</span></button><button type="button" role="tab" data-rush-variant="suika" aria-selected="'+!normal+'" class="'+(!normal?'active':'')+'">Suika mode <span>Answer · drop · merge</span></button></div>';
+ if(normal)return html+'<div class="settings"><strong>Your rush</strong><label>Time limit <select id="duration"><option value="60" '+(duration===60?'selected':'')+'>1 minute</option><option value="120" '+(duration===120?'selected':'')+'>2 minutes</option><option value="180" '+(duration===180?'selected':'')+'>3 minutes</option></select></label><span class="hint">No calculator questions · No repeated questions within a rush · Timer keeps running during feedback</span></div>';
  return html+'<div class="suika-intro"><div class="suika-preview-fruit" aria-hidden="true">🍉</div><div><div class="eyebrow">A LITTLE RECALL. A LITTLE PLAY.</div><h2>Make room for a watermelon.</h2><p>One correct answer unlocks <b>3 fruit drops</b>. Match two identical fruits to merge them. Keep the pile below the line.</p><span class="hint">Untimed · Multiple choice only · No free starting drops</span></div></div>';
 }
 const Suika=(()=>{
@@ -1828,7 +1932,7 @@ const Suika=(()=>{
  const cancel=id=>{if(id!==null&&window.cancelAnimationFrame)window.cancelAnimationFrame(id);};
  function clearDrag(){dragging=false;}
  function stop(){active=false;cancel(frame);frame=null;clearDrag();clearTimeout(retryTimer);clearTimeout(transitionTimer);retryTimer=transitionTimer=null;}
- function fillBag(){return shuffle(topics.flatMap(t=>questionsFor(t,'rush').map(q=>versionFor(q,t.id))));}
+ function fillBag(){return shuffle(topics.flatMap(t=>questionsFor(t,'suika').map(q=>versionFor(q,t.id))));}
  function quizVisible(){return !!(session?.kind==='suika'&&session.quizOpen);}
  function canInput(){return !!(world&&!world.over&&session?.kind==='suika'&&view==='session'&&!quizVisible()&&world.credits>0&&Date.now()>=session.inputAfter);}
  function start(ts){
@@ -1929,7 +2033,7 @@ const Suika=(()=>{
    const candidate=session.queue.findIndex((q,i)=>i>=target&&q.topic===topicId&&q.id!==current.id);
    if(candidate>=0)[session.queue[target],session.queue[candidate]]=[session.queue[candidate],session.queue[target]];
    else{
-    const pool=questionsFor(findTopic(topicId),'rush').filter(q=>q.id!==current.id);
+    const pool=questionsFor(findTopic(topicId),'suika').filter(q=>q.id!==current.id);
     session.queue.splice(target,0,versionFor(shuffle(pool)[0],topicId));
    }
   }
@@ -2016,7 +2120,7 @@ function shell(content){const active=view==='setup'?mode:view==='session'?(sessi
    document.querySelectorAll('.nav [data-nav]').forEach(b=>{const isActive=b.dataset.nav===active;b.classList.toggle('active',isActive);if(isActive)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
    return;
  }
- $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="brand-icon">φ</span>physics lab<span style="color:#81a85b">.</span></div><div class="course-tag">OCR A · A LEVEL PHYSICS</div><a class="all-labs" href="/">← All labs</a><nav class="nav" aria-label="Main navigation">${[['dashboard','home','Overview'],['learn','book','Learn & quiz'],['exam','exam','Exam practice'],['rush','bolt','Question Rush'],['progress','chart','My progress']].map(([id,ic,label])=>`<button data-nav="${id}" class="${active===id?'active':''}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav><div class="side-bottom"><div class="side-note"><strong>A little, often.</strong>Build understanding. Test your recall. Make it stick.</div><div class="profile"><div class="avatar">W</div><div>Your revision space<small>Progress saved on this device</small></div></div></div></aside><main class="main"><header class="topbar"><span class="mobile-brand">φ physics lab.</span><span class="crumb">Your classroom <span style="padding:0 11px;color:#a6afa5">/</span> <b>Physics A level</b></span><div class="top-right">${Sound.markup()}<a class="small-link" href="https://www.ocr.org.uk/qualifications/as-and-a-level/physics-a-h156-h556-from-2015/" target="_blank" rel="noopener">OCR specification ↗</a><span class="pill"><i class="dot"></i> H556</span></div></header><div class="content">${content}<footer class="footer"><span>Original practice content · ${skillTotal()} learning objectives · 25 exam sets</span><span>Fresh variants on repeat visits · Independent of OCR, Seneca & Cognito</span></footer>${!storageOK?'<p class="hint">Browser storage is unavailable. Your progress will last for this visit only.</p>':''}</div></main></div>`;
+ $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="brand-icon">${icon('atom')}</span>physics lab<span style="color:#81a85b">.</span></div><div class="course-tag">OCR A · A LEVEL PHYSICS</div><a class="all-labs" href="/">← All labs</a><nav class="nav" aria-label="Main navigation">${[['dashboard','home','Overview'],['learn','book','Learn & quiz'],['exam','exam','Exam practice'],['rush','bolt','Question Rush'],['progress','chart','My progress']].map(([id,ic,label])=>`<button data-nav="${id}" class="${active===id?'active':''}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav><div class="side-bottom"><div class="side-note"><strong>A little, often.</strong>Build understanding. Test your recall. Make it stick.</div><div class="profile"><div class="avatar">W</div><div>Your revision space<small>Progress saved on this device</small></div></div></div></aside><main class="main"><header class="topbar"><span class="mobile-brand"><span class="brand-icon">${icon('atom')}</span>physics lab.</span><span class="crumb">Your classroom <span style="padding:0 11px;color:#a6afa5">/</span> <b>Physics A level</b></span><div class="top-right">${Sound.markup()}<a class="small-link" href="https://www.ocr.org.uk/qualifications/as-and-a-level/physics-a-h156-h556-from-2015/" target="_blank" rel="noopener">OCR specification ↗</a><span class="pill"><i class="dot"></i> H556</span></div></header><div class="content">${content}<footer class="footer"><span>Original practice content · ${skillTotal()} learning objectives · 25 exam sets</span><span>Fresh variants on repeat visits · Independent of OCR, Seneca & Cognito</span></footer>${!storageOK?'<p class="hint">Browser storage is unavailable. Your progress will last for this visit only.</p>':''}</div></main></div>`;
 }
 function intro(eyebrow,title,subtitle){return `<div class="intro"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${subtitle}</p></div></div>`;}
 function csComingSoon(){
@@ -2031,12 +2135,12 @@ function dashboard(){document.title="Physics Lab — OCR A revision";const answe
 shell(`<div class="intro"><div><div class="eyebrow">YOUR PERSONAL PHYSICS SPACE</div><h1>Big ideas. Small steps.</h1><p>A little understanding today. A lot more confidence tomorrow.</p></div><span class="date-tag">${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</span></div>
 
 <div class="stats"><div class="stat"><div class="stat-icon icon">${icon('book')}</div><div><b>${answered}<span style="display:inline;font-size:13px;color:#8a9689"> / ${skillTotal()}</span></b><span>Skills practised successfully</span></div></div><div class="stat"><div class="stat-icon icon">${icon('target')}</div><div><b>${progress.attempts?Math.round(progress.correct/progress.attempts*100)+'%':'—'}</b><span>Accuracy across all attempts</span></div></div><div class="stat"><div class="stat-icon icon">${icon('check')}</div><div><b>${TOPICS.filter(t=>progress.exams[t.id]?.submitted).length}<span style="display:inline;font-size:13px;color:#8a9689"> / 25</span></b><span>Exam sets self-marked</span></div></div></div>
-<div class="section-title"><h2>Find your revision rhythm</h2><small>Three ways to make it stick</small></div><div class="mode-grid">${[['learn','book','Learn & quiz','Understand the idea, then put it into practice with guided questions.','Build your understanding'],['exam','exam','Exam practice','Go deeper with multi-part questions, worked answers and mark schemes.','Apply what you know'],['rush','bolt','Question Rush','Pick your topics. Beat the clock. Give your recall a proper workout.','Get into the flow']].map(([id,ic,title,desc,label])=>`<button class="mode-card" data-nav="${id}"><span class="icon">${icon(ic)}</span><h3>${title}</h3><p>${desc}</p><footer>${label}<span class="arrow">↗</span></footer></button>`).join('')}</div>
+<div class="section-title"><h2>Find your revision rhythm</h2><small>Three ways to make it stick</small></div><div class="mode-grid">${[['learn','book','Learn & quiz','Understand the idea, then put it into practice with guided questions.','Build your understanding'],['exam','exam','Exam practice','Go deeper with multi-part questions, worked answers and mark schemes.','Apply what you know'],['rush','bolt','Question Rush','Knowledge questions for quick recall, or fruit-drop play with the full question bank.','Get into the flow']].map(([id,ic,title,desc,label])=>`<button class="mode-card" data-nav="${id}"><span class="icon">${icon(ic)}</span><h3>${title}</h3><p>${desc}</p><footer>${label}<span class="arrow">↗</span></footer></button>`).join('')}</div>
 <div class="section-title"><h2>Explore your course</h2><button class="btn ghost" data-nav="learn">All topics <span>→</span></button></div><div class="module-grid">${MODULES.map(m=>{let ts=TOPICS.filter(t=>t.module===m.id),count=ts.reduce((s,t)=>s+completed(t),0),total=ts.reduce((sum,t)=>sum+t.questions.length,0);return `<button class="module-card" data-module="${m.id}"><div class="module-num">MODULE ${String(m.id).padStart(2,'0')}</div><h3>${m.title}</h3><small>${ts.length} topics · ${total} quiz questions</small><div class="track"><i style="width:${count/total*100}%"></i></div><small>${count} of ${total} answered correctly</small></button>`;}).join('')}</div>`);}
 function filtered(){return TOPICS.filter(t=>(moduleFilter==='all'||t.module===Number(moduleFilter))&&`${t.title} ${t.code}`.toLowerCase().includes(query.toLowerCase()));}
-function topicRows(){let ts=filtered();return ts.length?MODULES.filter(m=>ts.some(t=>t.module===m.id)).map(m=>`<h2 class="module-heading">MODULE ${m.id} <span style="padding:0 5px">/</span> ${m.full}</h2><div class="topic-list">${ts.filter(t=>t.module===m.id).map(t=>`<label class="topic-row"><input type="checkbox" data-topic="${t.id}" ${selected.has(t.id)?'checked':''}><div><h3>${t.title}</h3><p>${t.code} · ${mode==='exam'?`${totalMarks(t)} marks · original exam-style set`:`${questionsFor(t).length} questions · ${mode==='rush'?'multiple choice only':'choice + typed recall'}`}</p></div><span class="topic-percent">${mode==='exam'?(progress.exams[t.id]?.submitted?'✓':''):percentage(t)?percentage(t)+'%':''}</span></label>`).join('')}</div>`).join(''):'<div class="empty">No topics match your search. Try a different word or module.</div>';}
+function topicRows(){let ts=filtered();return ts.length?MODULES.filter(m=>ts.some(t=>t.module===m.id)).map(m=>`<h2 class="module-heading">MODULE ${m.id} <span style="padding:0 5px">/</span> ${m.full}</h2><div class="topic-list">${ts.filter(t=>t.module===m.id).map(t=>`<label class="topic-row"><input type="checkbox" data-topic="${t.id}" ${selected.has(t.id)?'checked':''}><div><h3>${t.title}</h3><p>${t.code} · ${mode==='exam'?`${totalMarks(t)} marks · original exam-style set`:`${questionsFor(t).length} questions · ${mode==='rush'?(rushVariant==='normal'?'knowledge only':'knowledge + calculations'):'choice + typed recall'}`}</p></div><span class="topic-percent">${mode==='exam'?(progress.exams[t.id]?.submitted?'✓':''):percentage(t)?percentage(t)+'%':''}</span></label>`).join('')}</div>`).join(''):'<div class="empty">No topics match your search. Try a different word or module.</div>';}
 function selectionText(){let n=selected.size,count=TOPICS.filter(t=>selected.has(t.id)).reduce((sum,t)=>sum+questionsFor(t).length,0);return `<div><p><strong>${n} topic${n===1?'':'s'} selected</strong></p><small>${mode==='exam'?`${n} practice set${n===1?'':'s'}`:`${count} questions in your ${mode==='rush'?'rush pool':'learning session'}`}</small></div><button class="btn ${mode==='rush'?'orange':''}" id="start" ${!n?'disabled':''}>${mode==='rush'?(rushVariant==='suika'?'Start Suika mode':'Start the rush'):mode==='exam'?'Start practice':'Start learning'} <span>→</span></button>`;}
-function setup(){const words={learn:['LEARN & QUIZ','Understand it. Then answer it.','Pick your topics for bite-sized lessons and questions with instant explanations.'],exam:['EXAM PRACTICE','Turn knowledge into marks.','Work through original multi-part questions, then self-mark with worked solutions.'],rush:['QUESTION RUSH','Quick thinking. Stronger recall.','Multiple-choice questions from your chosen topics. Typed recall stays in Learn & Quiz.']};shell(`${intro(...words[mode])}${mode==='rush'?rushControls():mode==='exam'?'<div class="settings"><span class="icon">'+icon('exam')+'</span><span>Write your answers first. Reveal the mark scheme when ready, then check the marks you earned.</span></div>':''}<div class="topic-tools"><input class="search" id="search" placeholder="Search topics or specification codes" aria-label="Search topics" value="${escapeHTML(query)}"><select id="module-filter" aria-label="Filter module"><option value="all">All modules</option>${MODULES.map(m=>`<option value="${m.id}" ${String(moduleFilter)===String(m.id)?'selected':''}>Module ${m.id} · ${m.title}</option>`).join('')}</select><button class="btn light" id="select-visible">Select shown</button><button class="btn light" id="clear-selection">Clear</button></div><div id="topic-rows">${topicRows()}</div><div class="selection-bar" id="selection-bar">${selectionText()}</div>`);}
+function setup(){const words={learn:['LEARN & QUIZ','Understand it. Then answer it.','Pick your topics for bite-sized lessons and questions with instant explanations.'],exam:['EXAM PRACTICE','Turn knowledge into marks.','Work through original multi-part questions, then self-mark with worked solutions.'],rush:['QUESTION RUSH','Quick thinking. Stronger recall.','Normal Rush tests knowledge without calculator work. Suika keeps the full multiple-choice bank, including calculations.']};shell(`${intro(...words[mode])}${mode==='rush'?rushControls():mode==='exam'?'<div class="settings"><span class="icon">'+icon('exam')+'</span><span>Write your answers first. Reveal the mark scheme when ready, then check the marks you earned.</span></div>':''}<div class="topic-tools"><input class="search" id="search" placeholder="Search topics or specification codes" aria-label="Search topics" value="${escapeHTML(query)}"><select id="module-filter" aria-label="Filter module"><option value="all">All modules</option>${MODULES.map(m=>`<option value="${m.id}" ${String(moduleFilter)===String(m.id)?'selected':''}>Module ${m.id} · ${m.title}</option>`).join('')}</select><button class="btn light" id="select-visible">Select shown</button><button class="btn light" id="clear-selection">Clear</button></div><div id="topic-rows">${topicRows()}</div><div class="selection-bar" id="selection-bar">${selectionText()}</div>`);}
 function updateSelection(){const el=$('#selection-bar');if(el)el.innerHTML=selectionText();}
 function stopTimers(){clearInterval(ticker);clearTimeout(autoNext);ticker=autoNext=null;Suika.stop();}
 function navigate(dest){stopTimers();session=null;query='';moduleFilter='all';if(['learn','rush','exam'].includes(dest)){mode=dest;view='setup';}else view=dest;render();window.scrollTo(0,0);}
