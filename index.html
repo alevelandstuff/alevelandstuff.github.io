@@ -1410,6 +1410,7 @@ for(const t of TOPICS){
 
 /* Small synthesized earcons: no downloads, autoplay or external audio files. */
 const Sound=(()=>{
+ const volume=0.55;
  const key='physics-lab-audio-v1';
  let enabled=true,context=null,master=null,unavailable=false,resumePending=null,epoch=0;
  const voices=new Set();
@@ -1418,7 +1419,7 @@ const Sound=(()=>{
   if(context&&context.state!=='closed')return context;
   const Audio=window.AudioContext||window.webkitAudioContext;
   if(!Audio){unavailable=true;return null;}
-  try{context=new Audio({latencyHint:'interactive'});master=context.createGain();master.gain.value=enabled?0.45:0;master.connect(context.destination);return context;}catch{unavailable=true;return null;}
+  try{context=new Audio({latencyHint:'interactive'});master=context.createGain();master.gain.value=enabled?volume:0;master.connect(context.destination);return context;}catch{unavailable=true;return null;}
  }
  function unlock(){
   if(!enabled)return;
@@ -1496,7 +1497,7 @@ const Sound=(()=>{
    for(const voice of voices){try{voice.stop(now+0.012);}catch{}}
   }else if(enabled){
    unlock();
-   if(master&&context){master.gain.cancelScheduledValues(context.currentTime);master.gain.setValueAtTime(0.45,context.currentTime);}
+   if(master&&context){master.gain.cancelScheduledValues(context.currentTime);master.gain.setValueAtTime(volume,context.currentTime);}
    play('tap');
   }
   refresh();return enabled;
@@ -2275,7 +2276,7 @@ const totalMarks=t=>t.exam.parts.reduce((s,p)=>s+p[1].length,0);
 const examMarks=t=>{const ex=progress.exams[t.id];return ex?Object.values(ex.marks||{}).filter(Boolean).length:0;};
 const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 function shell(content){const active=view==='setup'?mode:view==='session'?(session?.kind==='exam'?'exam':(session?.kind==='rush'||session?.kind==='suika')?'rush':'learn'):view;
- const footer=`<footer class="footer"><span>Original practice content · ${skillTotal()} learning objectives · ${TOPICS.length} exam sets</span><span>Fresh variants on repeat visits · Independent of ${COURSE.board}, Seneca & Cognito</span></footer>`;
+ const footer=`<footer class="footer"><span>Fresh variants on repeat visits · Independent of ${COURSE.board}, Seneca & Cognito</span></footer>`;
  const existing=$('.main .content');
  if(existing?.isConnected){
    const previousWidth=$('#session-track')?.style.width;
@@ -2285,7 +2286,7 @@ function shell(content){const active=view==='setup'?mode:view==='session'?(sessi
    document.querySelectorAll('.nav [data-nav]').forEach(b=>{const isActive=b.dataset.nav===active;b.classList.toggle('active',isActive);if(isActive)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
    return;
  }
- $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="brand-icon">${icon(COURSE.icon)}</span>${COURSE.short}<span style="color:#81a85b">.</span></div><div class="course-tag">${COURSE.tag}</div><a class="all-labs" href="/">← All labs</a><nav class="nav" aria-label="Main navigation">${[['dashboard','home','Overview'],['learn','book','Learn & quiz'],['exam','exam','Exam practice'],['rush','bolt','Question Rush'],['progress','chart','My progress']].map(([id,ic,label])=>`<button data-nav="${id}" class="${active===id?'active':''}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav><div class="side-bottom"><div class="side-note"><strong>A little, often.</strong>Build understanding. Test your recall. Make it stick.</div><div class="profile"><div class="avatar">W</div><div>Your revision space<small>Progress saved on this device</small></div></div></div></aside><main class="main"><header class="topbar"><a class="mobile-brand" href="/"><span class="brand-icon">${icon(COURSE.icon)}</span>${COURSE.short}.</a><span class="crumb">Your classroom <span style="padding:0 11px;color:#a6afa5">/</span> <b>${COURSE.subject} A level</b></span><div class="top-right">${Sound.markup()}<a class="small-link" href="${COURSE.spec}" target="_blank" rel="noopener">${COURSE.board} specification ↗</a><span class="pill"><i class="dot"></i> ${COURSE.code}</span></div></header><div class="content">${content}<footer class="footer"><span>Original practice content · ${skillTotal()} learning objectives · ${TOPICS.length} exam sets</span><span>Fresh variants on repeat visits · Independent of ${COURSE.board}, Seneca & Cognito</span></footer>${!storageOK?'<p class="hint">Browser storage is unavailable. Your progress will last for this visit only.</p>':''}</div></main></div>`;
+ $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="brand-icon">${icon(COURSE.icon)}</span>${COURSE.short}<span style="color:#81a85b">.</span></div><div class="course-tag">${COURSE.tag}</div><a class="all-labs" href="/">← All labs</a><nav class="nav" aria-label="Main navigation">${[['dashboard','home','Overview'],['learn','book','Learn & quiz'],['exam','exam','Exam practice'],['rush','bolt','Question Rush'],['progress','chart','My progress']].map(([id,ic,label])=>`<button data-nav="${id}" class="${active===id?'active':''}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav><div class="side-bottom"><div class="side-note"><strong>A little, often.</strong>Build understanding. Test your recall. Make it stick.</div><div class="profile"><div class="avatar">W</div><div>Your revision space<small>Progress saved on this device</small></div></div></div></aside><main class="main"><header class="topbar"><a class="mobile-brand" href="/"><span class="brand-icon">${icon(COURSE.icon)}</span>${COURSE.short}.</a><span class="crumb">Your classroom <span style="padding:0 11px;color:#a6afa5">/</span> <b>${COURSE.subject} A level</b></span><div class="top-right">${Sound.markup()}<a class="small-link" href="${COURSE.spec}" target="_blank" rel="noopener">${COURSE.board} specification ↗</a></div></header><div class="content">${content}<footer class="footer"><span>Fresh variants on repeat visits · Independent of ${COURSE.board}, Seneca & Cognito</span></footer>${!storageOK?'<p class="hint">Browser storage is unavailable. Your progress will last for this visit only.</p>':''}</div></main></div>`;
 }
 function intro(eyebrow,title,subtitle){return `<div class="intro"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${subtitle}</p></div></div>`;}
 function homeScreen(){
