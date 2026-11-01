@@ -1162,7 +1162,7 @@ function chooseQuestionVersion(skill){
    let seed=1+Math.floor(Math.random()*2147483646);
    variantRng=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
    try{variant=skill.make(seed);}finally{variantRng=null;}
-   if(variant.prompt!==last)break;
+   if((variant.type==='cloze'?JSON.stringify(variant.cards):variant.prompt)!==last)break;
   }
  }else if(skill.versions){
   let bag=progress.variantBags[key];
@@ -1173,7 +1173,7 @@ function chooseQuestionVersion(skill){
   }
   variant=skill.versions[bag.shift()];
  }else variant=skill;
- progress.variantLast[key]=variant.prompt;return variant;
+ progress.variantLast[key]=variant.type==='cloze'?JSON.stringify(variant.cards):variant.prompt;return variant;
 }
 const NEW_RECALL={
 planning:[
@@ -1668,6 +1668,7 @@ function clozeCard(text){
  let cursor=0;const parts=[],answers=[];for(const m of chosen){parts.push(text.slice(cursor,m.index));answers.push(m[0]);cursor=m.index+m[0].length;}parts.push(text.slice(cursor));return {text,parts,answers};
 }
 for(const t of TOPICS){
+ t.clozeLabels={};for(const q of t.questions.filter(q=>q.type==='definition'))t.clozeLabels[q.answer]=q.prompt.replace(/^Define /,'').replace(/[.]$/,'');
  const originals=t.questions.filter(q=>q.type==='definition'||q.type==='gap').flatMap(q=>[q,...(q.versions||[])]).map(q=>q.type==='definition'?q.answer:q.definition).filter(Boolean);
  t.clozeDefinitions=[...new Set([...originals,...(extraDefinitions[t.id]||[])])].filter(s=>!s.includes('___')&&clozeWords(s).length);
  if(t.clozeDefinitions.length<3)throw Error('Need three definitions: '+t.id);
@@ -1680,7 +1681,7 @@ questionsFor=function(t,kind=mode){
  const index=list.findIndex(isTyped);if(index<0)return list;
  const base=list[index];list[index]={...base,type:'cloze',versions:undefined,learn:'',make:()=>{
   progress.clozeLast||={};let cards;
-  for(let i=0;i<12;i++){cards=shuffle(t.clozeDefinitions).slice(0,3).map(clozeCard);if(JSON.stringify(cards)!==progress.clozeLast[t.id])break;}
+  for(let i=0;i<12;i++){cards=shuffle(t.clozeDefinitions).slice(0,3).map(text=>({...clozeCard(text),label:t.clozeLabels[text]||''}));if(JSON.stringify(cards)!==progress.clozeLast[t.id])break;}
   progress.clozeLast[t.id]=JSON.stringify(cards);
   return {type:'cloze',prompt:'Complete the definitions',cards,answer:cards.map(c=>c.text).join(' '),explain:'The complete definitions are shown above.'};
  }};return list;
@@ -1692,7 +1693,7 @@ function clozeState(q){
 }
 function renderCloze(q){
  const s=clozeState(q),solved=s.accepted.filter(row=>row.every(Boolean)).length;
- return '<div class="cloze-round"><p class="hint">Fill every gap. Correct words check automatically. Complete all three, or reveal the words to record a wrong answer.</p><p id="cloze-count" role="status">'+solved+' of 3 definitions complete</p>'+q.cards.map((card,i)=>'<section class="cloze-card '+(s.accepted[i].every(Boolean)?'complete':'')+'" data-cloze-card="'+i+'"><h3>Definition '+(i+1)+'</h3><p class="cloze-sentence">'+card.parts.map((part,j)=>escapeHTML(part)+(j<card.answers.length?'<input type="text" class="cloze-word '+(s.accepted[i][j]?'accepted':'')+'" data-cloze="'+i+'" data-word="'+j+'" aria-label="Definition '+(i+1)+', missing word '+(j+1)+'" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60" style="width:'+Math.max(7,card.answers[j].length+2)+'ch" value="'+escapeHTML(s.values[i][j])+'" '+(session.answered||s.accepted[i][j]?'readonly':'')+'>':'')).join('')+'</p></section>').join('')+(!session.answered?'<button type="button" class="btn light" id="reveal-cloze">Reveal words (counts as wrong)</button>':'')+'</div>';
+ return '<div class="cloze-round"><p class="hint">Fill every gap. Correct words check automatically. Complete all three, or reveal the words to record a wrong answer.</p><p id="cloze-count" role="status">'+solved+' of 3 definitions complete</p>'+q.cards.map((card,i)=>'<section class="cloze-card '+(s.accepted[i].every(Boolean)?'complete':'')+'" data-cloze-card="'+i+'"><h3>Definition '+(i+1)+(card.label?' — '+escapeHTML(card.label):'')+'</h3><p class="cloze-sentence">'+card.parts.map((part,j)=>escapeHTML(part)+(j<card.answers.length?'<input type="text" class="cloze-word '+(s.accepted[i][j]?'accepted':'')+'" data-cloze="'+i+'" data-word="'+j+'" aria-label="Definition '+(i+1)+', missing word '+(j+1)+'" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60" style="width:'+Math.max(7,card.answers[j].length+2)+'ch" value="'+escapeHTML(s.values[i][j])+'" '+(session.answered||s.accepted[i][j]?'readonly':'')+'>':'')).join('')+'</p></section>').join('')+(!session.answered?'<button type="button" class="btn light" id="reveal-cloze">Reveal words (counts as wrong)</button>':'')+'</div>';
 }
 const originalRenderResponse=renderResponse;renderResponse=q=>q.type==='cloze'?renderCloze(q):originalRenderResponse(q);
 const originalTypedFeedback=typedFeedback;typedFeedback=function(q){if(q.type!=='cloze')return originalTypedFeedback(q);const r=session.results.at(-1);return '<div class="feedback '+(r?.correct?'':'wrong')+'" role="status"><strong>'+(r?.correct?'All three definitions complete.':'Words revealed — this round counts as wrong.')+'</strong><p>'+ (r?.correct?'Ready for the next question.':'Read the completed definitions before continuing.')+'</p></div>';};
