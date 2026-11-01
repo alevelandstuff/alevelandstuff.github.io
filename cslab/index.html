@@ -6,6 +6,7 @@
 
 /* Keep header controls aligned after removing the classroom breadcrumb. */
 .top-right{margin-left:auto}
+.cloze-round>p{margin-bottom:16px}.cloze-card{padding:18px;margin:14px 0;border:1px solid var(--line);border-radius:12px;transition:background .25s,border-color .25s}.cloze-card h3{font-size:12px;color:var(--muted);margin-bottom:10px}.cloze-sentence{font-size:17px;line-height:2.6}.cloze-word{display:inline-block;max-width:100%;min-width:7ch;border:0;border-bottom:2px solid #9ba99c;border-radius:5px 5px 0 0;background:#edf1eb;padding:4px 7px;margin:0 3px;font:inherit;line-height:1.6;color:var(--ink);transition:background .2s,border-color .2s}.cloze-word:focus{outline:2px solid var(--green);outline-offset:2px}.cloze-word.accepted{background:#e5f3d9;border-color:#69984b;color:#315326}.cloze-card.complete{background:#f4f9ef;border-color:#a4bd8e}.cs-subject .cloze-card.complete{background:#f2f5ff}.cs-subject .cloze-word.accepted{background:#e0e9ff;border-color:#6c83ba;color:#283f74}@media(max-width:760px){.cloze-card{padding:14px}.cloze-sentence{font-size:15px}}
 
 /* Motion supports orientation and feedback without delaying answers. */
 :root{--ease-out:cubic-bezier(.22,1,.36,1);--ease-soft:cubic-bezier(.2,.7,.3,1)}
@@ -906,7 +907,7 @@ function renderResponse(q){
 }
 function checkTyped(provided){
  if(!session||view!=='session'||session.phase==='lesson'||session.answered||session.kind==='rush')return false;
- const q=currentQuestion();if(!isTyped(q))return false;
+ const q=currentQuestion();if(!isTyped(q)||q.type==='cloze')return false;
  const response=String(typeof provided==='string'?provided:($('#typed-answer')?.value||'')).trim().slice(0,q.type==='gap'?120:1500);
  if(!response){const error=$('#typed-error');if(error)error.textContent='Type an answer before checking.';$('#typed-answer')?.setAttribute('aria-invalid','true');return false;}
  const grade=gradeTyped(q,response),previous=progress.answers[q.id]||{};
@@ -956,6 +957,123 @@ document.addEventListener('click',event=>{
 });
 document.addEventListener('keydown',event=>{if(event.target.id==='typed-answer'&&(event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();checkTyped();}});
 
+
+/* Additional concise definitions for rotating Learn-only definition rounds. */
+const extraDefinitions={
+ planning:['A dependent variable is the quantity measured to investigate the effect of changing the independent variable.','A control variable is a quantity kept constant to make a comparison valid.'],
+ analysis:['A random error causes unpredictable variation in repeated measurements.','Precision describes the closeness of repeated measurements to one another.'],
+ units:['A base quantity is a physical quantity defined independently of other quantities.','A derived unit is formed by combining base units.'],
+ uncertainty:['Percentage uncertainty is the absolute uncertainty divided by the measured value, multiplied by one hundred.','Resolution is the smallest change in a quantity that an instrument can distinguish.'],
+ vectors:['A scalar is a quantity with magnitude only.','The resultant vector is the single vector equivalent to the combined effect of several vectors.'],
+ motion:['Displacement is the vector change in position from a starting point.','Speed is the distance travelled per unit time.'],
+ forces:['Density is mass per unit volume.','Upthrust is the resultant upward force exerted by a fluid on an immersed object.'],
+ energy:['Power is the rate of energy transfer.','Efficiency is the ratio of useful output energy to total input energy.'],
+ materials:['Stress is the tensile force per unit cross-sectional area.','Strain is extension divided by original length.'],
+ momentum:['Momentum is the product of mass and velocity.','Impulse is the product of a constant force and the time for which it acts.'],
+ current:['Electric current is the rate of flow of electric charge.','Charge carriers are particles that carry electric charge through a material.'],
+ resistance:['Resistance is potential difference divided by current.','Resistivity is a material property relating resistance to conductor length and cross-sectional area.'],
+ circuits:['Electromotive force is the energy transferred from other forms to electrical energy per unit charge by a source.','Internal resistance is the resistance within a source that causes energy to be dissipated when current flows.'],
+ waves:['Wavelength is the distance between adjacent points in phase on a wave.','Frequency is the number of complete oscillations per unit time.'],
+ quantum:['A photon is a discrete quantum of electromagnetic energy.','The work function is the minimum energy needed to remove an electron from the surface of a metal.'],
+ thermal:['Internal energy is the sum of the random kinetic energies and potential energies of the particles in a system.','Specific heat capacity is the energy needed per unit mass to raise temperature by one kelvin without a change of state.'],
+ circular:['Angular velocity is the rate of change of angular displacement.','Centripetal acceleration is acceleration towards the centre of a circular path.'],
+ oscillations:['Amplitude is the maximum displacement from the equilibrium position.','Resonance occurs when a driving frequency is close to a natural frequency, producing a large amplitude of oscillation.'],
+ gravity:['Gravitational field strength is force per unit mass on a small test mass.','Gravitational potential is work done per unit mass in bringing a small test mass from infinity to a point.'],
+ astro:['Luminosity is the total power radiated by a star.','A light-year is the distance travelled by light in a vacuum in one year.'],
+ capacitors:['Capacitance is charge stored per unit potential difference.','The time constant is the time for the charge on a discharging capacitor to fall to one over e of its initial value.'],
+ electric:['Electric field strength is force per unit positive test charge.','Electric potential is work done per unit positive charge in bringing a small test charge from infinity to a point.'],
+ magnetic:['Magnetic flux is the product of magnetic flux density and the area perpendicular to the field.','Magnetic flux linkage is magnetic flux through one turn multiplied by the number of turns.'],
+ nuclear:['Isotopes are nuclei of the same element with equal proton numbers but different neutron numbers.','Activity is the number of nuclear decays per unit time.'],
+ medical:['Acoustic impedance is the product of density and the speed of sound in a material.','An ultrasound pulse is a short burst of sound with frequency above the upper limit of human hearing.'],
+ 'cs-types':['A data type specifies a set of values and the operations allowed on those values.','A variable is a named storage location whose value can change during program execution.'],
+ 'cs-control':['Selection chooses which instructions to execute according to a condition.','Iteration repeats a sequence of instructions.'],
+ 'cs-subroutines':['A parameter is a named variable used to pass information into a subroutine.','Recursion occurs when a subroutine calls itself.'],
+ 'cs-oop':['A class is a template defining the attributes and methods of its objects.','An object is an instance of a class.'],
+ 'cs-structures':['An array is an indexed collection of elements of the same data type.','An abstract data type specifies data and permitted operations independently of implementation.'],
+ 'cs-stacks':['A stack is a last-in first-out abstract data type.','A queue is a first-in first-out abstract data type.'],
+ 'cs-trees':['A tree is a connected undirected graph with no cycles.','A leaf is a tree node with no children.'],
+ 'cs-searchsort':['A linear search checks elements in sequence until the target is found or all elements have been checked.','Binary search repeatedly halves the search interval in ordered data.'],
+ 'cs-traversals':['A depth-first traversal explores a branch as far as possible before backtracking.','A breadth-first traversal visits nodes in order of their distance from the start node.'],
+ 'cs-computation':['An algorithm is a finite sequence of unambiguous instructions for solving a problem.','A Turing machine is an abstract model of computation with a tape, a read-write head and a finite set of states.'],
+ 'cs-binary':['A bit is a binary digit with a value of zero or one.','A byte is a group of eight bits.'],
+ 'cs-real':['Overflow occurs when a result is outside the range representable using the available bits.','Rounding error is the difference introduced when a value is approximated to a limited precision.'],
+ 'cs-media':['Sampling rate is the number of samples taken per unit time.','Colour depth is the number of bits used to represent the colour of one pixel.'],
+ 'cs-crypto':['Encryption transforms plaintext into ciphertext using an algorithm and a key.','A key is a value used by a cryptographic algorithm to control encryption or decryption.'],
+ 'cs-logic':['A truth table lists the output of a logical expression for every possible combination of inputs.','A logic gate performs a Boolean operation on binary inputs to produce a binary output.'],
+ 'cs-architecture':['A register is a small high-speed storage location inside the processor.','A bus is a set of connections used to transfer data, addresses or control signals between components.'],
+ 'cs-software':['An operating system manages hardware resources and provides services for application software.','A compiler translates source code into target code before the translated program is executed.'],
+ 'cs-communications':['A protocol is an agreed set of rules for communication between devices.','Bandwidth is the maximum data transfer rate of a communication channel.'],
+ 'cs-internet':['A router forwards packets between networks using destination addresses.','A subnet mask identifies the network and host parts of an IPv4 address.'],
+ 'cs-security':['Authentication verifies a claimed identity.','Authorisation determines which resources an authenticated user is permitted to access.'],
+ 'cs-databases':['A primary key is an attribute or set of attributes that uniquely identifies each record in a relation.','A foreign key is an attribute or set of attributes that references a key in another relation or the same relation.'],
+ 'cs-normalisation':['A functional dependency exists when one attribute value determines another attribute value.','A composite key consists of more than one attribute.'],
+ 'cs-bigdata':['Big data refers to datasets whose volume, velocity or variety makes conventional processing difficult.','Data mining discovers useful patterns and relationships in large datasets.'],
+ 'cs-functional':['A pure function returns the same output for the same inputs and has no side effects.','A higher-order function takes a function as an argument or returns a function as a result.'],
+ 'cs-development':['Validation checks whether data satisfies specified rules.','Verification checks whether data has been copied or entered accurately.'],
+ 'cs-ethics':['Personal data is information relating to an identified or identifiable living individual.','An ethical issue concerns judgements about what is right or wrong.']
+};
+
+/* Three inline definition challenges, restricted to Learn & quiz. */
+const clozeStop=new Set('a an the is are was were be being been of in on at to for from by with and or as that which whose its it this one per unit same used using through into when than each any can has have only both number value quantity'.split(' '));
+function clozeWords(text){return [...text.matchAll(/[A-Za-z]+(?:[-'][A-Za-z]+)*/g)].filter(m=>m[0].length>3&&!clozeStop.has(m[0].toLowerCase()));}
+function clozeCard(text){
+ const candidates=clozeWords(text),distinct=[...new Map(candidates.map(m=>[m[0].toLowerCase(),m])).values()];
+ const chosen=shuffle(distinct).slice(0,Math.min(3,Math.max(1,Math.floor(distinct.length/2)))).sort((a,b)=>a.index-b.index);
+ let cursor=0;const parts=[],answers=[];for(const m of chosen){parts.push(text.slice(cursor,m.index));answers.push(m[0]);cursor=m.index+m[0].length;}parts.push(text.slice(cursor));return {text,parts,answers};
+}
+for(const t of TOPICS){
+ const originals=t.questions.filter(q=>q.type==='definition'||q.type==='gap').flatMap(q=>[q,...(q.versions||[])]).map(q=>q.type==='definition'?q.answer:q.definition).filter(Boolean);
+ t.clozeDefinitions=[...new Set([...originals,...(extraDefinitions[t.id]||[])])].filter(s=>!s.includes('___')&&clozeWords(s).length);
+ if(t.clozeDefinitions.length<3)throw Error('Need three definitions: '+t.id);
+ const extras=(extraDefinitions[t.id]||[]).filter(s=>!originals.includes(s));
+ if(extras.length&&t.lessonSections){t.lessonSections.push({title:'More definitions to know',points:extras});t.lesson=t.lessonSections.flatMap(s=>s.points);}
+}
+const originalQuestionsFor=questionsFor;
+questionsFor=function(t,kind=mode){
+ const list=originalQuestionsFor(t,kind);if(kind!=='learn')return list;
+ const index=list.findIndex(isTyped);if(index<0)return list;
+ const base=list[index];list[index]={...base,type:'cloze',versions:undefined,learn:'',make:()=>{
+  progress.clozeLast||={};let cards;
+  for(let i=0;i<12;i++){cards=shuffle(t.clozeDefinitions).slice(0,3).map(clozeCard);if(JSON.stringify(cards)!==progress.clozeLast[t.id])break;}
+  progress.clozeLast[t.id]=JSON.stringify(cards);
+  return {type:'cloze',prompt:'Complete the definitions',cards,answer:cards.map(c=>c.text).join(' '),explain:'The complete definitions are shown above.'};
+ }};return list;
+};
+const originalIsTyped=isTyped;isTyped=q=>q.type==='cloze'||originalIsTyped(q);
+function clozeState(q){
+ if(!session.cloze||session.cloze.index!==session.index)session.cloze={index:session.index,values:q.cards.map(c=>c.answers.map(()=>'')),accepted:q.cards.map(c=>c.answers.map(()=>false)),revealed:false};
+ return session.cloze;
+}
+function renderCloze(q){
+ const s=clozeState(q),solved=s.accepted.filter(row=>row.every(Boolean)).length;
+ return '<div class="cloze-round"><p class="hint">Fill every gap. Correct words check automatically. Complete all three, or reveal the words to record a wrong answer.</p><p id="cloze-count" role="status">'+solved+' of 3 definitions complete</p>'+q.cards.map((card,i)=>'<section class="cloze-card '+(s.accepted[i].every(Boolean)?'complete':'')+'" data-cloze-card="'+i+'"><h3>Definition '+(i+1)+'</h3><p class="cloze-sentence">'+card.parts.map((part,j)=>escapeHTML(part)+(j<card.answers.length?'<input type="text" class="cloze-word '+(s.accepted[i][j]?'accepted':'')+'" data-cloze="'+i+'" data-word="'+j+'" aria-label="Definition '+(i+1)+', missing word '+(j+1)+'" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60" style="width:'+Math.max(7,card.answers[j].length+2)+'ch" value="'+escapeHTML(s.values[i][j])+'" '+(session.answered||s.accepted[i][j]?'readonly':'')+'>':'')).join('')+'</p></section>').join('')+(!session.answered?'<button type="button" class="btn light" id="reveal-cloze">Reveal words (counts as wrong)</button>':'')+'</div>';
+}
+const originalRenderResponse=renderResponse;renderResponse=q=>q.type==='cloze'?renderCloze(q):originalRenderResponse(q);
+const originalTypedFeedback=typedFeedback;typedFeedback=function(q){if(q.type!=='cloze')return originalTypedFeedback(q);const r=session.results.at(-1);return '<div class="feedback '+(r?.correct?'':'wrong')+'" role="status"><strong>'+(r?.correct?'All three definitions complete.':'Words revealed — this round counts as wrong.')+'</strong><p>'+ (r?.correct?'Ready for the next question.':'Read the completed definitions before continuing.')+'</p></div>';};
+function finishCloze(reveal=false){
+ if(!session||session.kind!=='learn'||view!=='session'||session.phase==='lesson'||session.answered)return;
+ const q=currentQuestion();if(q.type!=='cloze')return;const s=clozeState(q);
+ if(!reveal&&!s.accepted.every(row=>row.every(Boolean)))return;
+ s.revealed=reveal;session.choice=s.values.map(row=>row.join(', ')).join('; ');session.answered=true;
+ const correct=!reveal,previous=progress.answers[q.id]||{};session.results.push({...q,choice:reveal?'Words revealed':session.choice,correct});
+ progress.attempts++;if(correct)progress.correct++;progress.answers[q.id]={correct:!!(previous.correct||correct),lastCorrect:correct,attempts:(previous.attempts||0)+1};
+ if(reveal){s.values=q.cards.map(c=>[...c.answers]);s.accepted=q.cards.map(c=>c.answers.map(()=>true));}
+ persist();Sound.play(correct?'correct':'incorrect');questionView();
+}
+function acceptCloze(input){
+ if(input.isComposing||!session||session.kind!=='learn'||view!=='session'||session.phase==='lesson'||session.answered)return;
+ const q=currentQuestion();if(q.type!=='cloze')return;const s=clozeState(q),i=Number(input.dataset.cloze),j=Number(input.dataset.word);
+ if(!q.cards[i]?.answers[j]||s.accepted[i][j])return;s.values[i][j]=input.value;
+ if(normaliseAnswer(input.value)!==normaliseAnswer(q.cards[i].answers[j]))return;
+ s.accepted[i][j]=true;input.value=q.cards[i].answers[j];s.values[i][j]=input.value;input.readOnly=true;input.classList.add('accepted');
+ if(s.accepted[i].every(Boolean)){document.querySelector('[data-cloze-card="'+i+'"]')?.classList.add('complete');if(s.accepted.filter(row=>row.every(Boolean)).length<3)Sound.play('correct');}
+ const solved=s.accepted.filter(row=>row.every(Boolean)).length;const count=document.querySelector('#cloze-count');if(count)count.textContent=solved+' of 3 definitions complete';
+ if(solved===3){finishCloze();return;}
+ const next=document.querySelector('.cloze-word:not([readonly])');next?.focus();
+}
+document.addEventListener('input',event=>{if(event.target.dataset?.cloze!==undefined&&!event.isComposing)acceptCloze(event.target);});
+document.addEventListener('compositionend',event=>{if(event.target.dataset?.cloze!==undefined)acceptCloze(event.target);});
+document.addEventListener('click',event=>{const button=event.target.closest('button');if(button?.id==='reveal-cloze'&&!button.disabled)finishCloze(true);});
 
 function rushEquations(){return "";}
 function rushQuestion(q){return q;}
@@ -1341,7 +1459,7 @@ function lessonView(t){
  return '<article class="panel lesson"><div class="lesson-label">First, the idea · '+t.code+'</div><h2>'+t.title+'</h2><div class="lesson-notes">'+notes+'</div><div class="session-bottom"><span>Read at your own pace. You can revisit these notes during the quiz.</span><button class="btn" id="lesson-done">Try the questions →</button></div></article>';
 }
 function questionView(){if(session?.kind==='suika'){Suika.render();return;}const q=currentQuestion(),t=TOPICS.find(t=>t.id===q.topic);progress.lastTopic=t.id;persist();const isRush=session.kind==='rush';const done=session.results.length;let content=`<div class="session"><button class="back" data-nav="${isRush?'rush':'learn'}">← End session and choose topics</button><div class="session-head"><span>${isRush?'QUESTION RUSH':`LEARN & QUIZ · ${t.title}`}</span>${isRush?`<span class="timer" id="timer">${formatTime(Math.max(0,Math.ceil((session.ends-Date.now())/1000)))}</span>`:`<span>Question ${session.index+1} of ${session.queue.length}</span>`}</div><div class="track"><i style="width:${isRush?Math.max(0,100*(session.ends-Date.now())/(duration*1000)):100*done/session.queue.length}%" id="session-track"></i></div>`;
-if(session.phase==='lesson')content+=lessonView(t);else{content+=`<article class="panel"><span class="badge">${t.code} · ${t.title}</span>${isRush?`<span class="marks" id="rush-score">${session.results.filter(r=>r.correct).length} correct</span>`:''}${!isRush&&q.learn?`<div class="learning-cue"><strong>Remember the idea</strong>${q.learn}</div>`:''}<h2 class="question">${q.prompt}</h2>${isRush?rushEquations(q):''}${renderResponse(q)}<div id="feedback-slot" aria-live="polite">${session.answered?feedback(q):''}</div><div class="session-bottom" id="question-actions">${!isRush?'<button class="btn ghost" id="show-lesson">Revisit the idea</button>':'<span class="shortcuts">Use keys 1–4 to answer</span>'}${session.answered?`<button class="btn" id="next" ${session.kind==='rush'?'disabled':''}>${session.index===session.queue.length-1?'See results':'Next question'} →</button>`:`<span class="hint">${isRush?'Choose quickly. Every correct answer counts.':isTyped(q)?'Check your wording when you are ready.':'Choose an answer to check your understanding.'}</span>`}</div></article>`;}
+if(session.phase==='lesson')content+=lessonView(t);else{content+=`<article class="panel"><span class="badge">${t.code} · ${t.title}</span>${isRush?`<span class="marks" id="rush-score">${session.results.filter(r=>r.correct).length} correct</span>`:''}${!isRush&&q.learn?`<div class="learning-cue"><strong>Remember the idea</strong>${q.learn}</div>`:''}<h2 class="question">${q.prompt}</h2>${isRush?rushEquations(q):''}${renderResponse(q)}<div id="feedback-slot" aria-live="polite">${session.answered?feedback(q):''}</div><div class="session-bottom" id="question-actions">${!isRush?'<button class="btn ghost" id="show-lesson">Revisit the idea</button>':'<span class="shortcuts">Use keys 1–4 to answer</span>'}${session.answered?`<button class="btn" id="next" ${session.kind==='rush'?'disabled':''}>${session.index===session.queue.length-1?'See results':'Next question'} →</button>`:`<span class="hint">${isRush?'Choose quickly. Every correct answer counts.':q.type==='cloze'?'Correct words check automatically.':isTyped(q)?'Check your wording when you are ready.':'Choose an answer to check your understanding.'}</span>`}</div></article>`;}
 content+=`<div class="session-bottom"><span id="session-count">${session.results.filter(r=>r.correct).length} correct · ${session.results.length} answered</span><button class="btn light" id="finish-early">Finish session</button></div></div>`;shell(content);}
 function feedback(q){if(isTyped(q))return typedFeedback(q);let right=session.choice===q.answer;return `<div class="feedback ${right?'':'wrong'}" role="status"><strong>${right?'✓ That’s right.':'Let’s make this one stick.'}</strong>${right?'':`<p style="margin-bottom:8px">Correct answer: <b>${q.answer}</b></p>`}${session.kind==='rush'?rushExplanation(q):escapeHTML(q.explain)}${session.kind==='rush'?'<p class="hint" style="margin-top:9px">'+(right?'Moving on automatically.':'Next question in <span id="rush-cooldown">'+Math.max(0,Math.ceil((session.advanceAt-Date.now())/1000))+'</span> seconds.')+'</p>':''}</div>`;}
 function answer(index){if(session?.kind==='suika'){Suika.answer(index);return;}if(!session||session.answered||view!=='session'||session.phase==='lesson')return;if(session.kind==='rush'&&Date.now()>=session.ends){finish();return;}let q=currentQuestion();if(isTyped(q))return;let choice=q.options[index];if(choice===undefined)return;let right=choice===q.answer;session.choice=choice;session.answered=true;session.results.push({id:q.id,topic:q.topic,prompt:q.prompt,answer:q.answer,choice,correct:right,explain:q.explain,options:[...q.options],learn:q.learn||''});progress.attempts++;if(right)progress.correct++;const previous=progress.answers[q.id]||{};progress.answers[q.id]={correct:!!(previous.correct||right),lastCorrect:right,attempts:(previous.attempts||0)+1};if(session.kind==='rush')session.advanceAt=Date.now()+(right?700:3000);persist();Sound.play(right?'correct':'incorrect');revealAnswer();if(session.kind==='rush')autoNext=setTimeout(nextQuestion,right?700:3000);}
