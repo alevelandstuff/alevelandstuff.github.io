@@ -8,6 +8,7 @@
 .top-right{margin-left:auto}
 .cloze-round>p{margin-bottom:16px}.cloze-card{padding:18px;margin:14px 0;border:1px solid var(--line);border-radius:12px;transition:background .25s,border-color .25s}.cloze-card h3{font-size:12px;color:var(--muted);margin-bottom:10px}.cloze-sentence{font-size:17px;line-height:2.6}.cloze-word{display:inline-block;max-width:100%;min-width:7ch;border:0;border-bottom:2px solid #9ba99c;border-radius:5px 5px 0 0;background:#edf1eb;padding:4px 7px;margin:0 3px;font:inherit;line-height:1.6;color:var(--ink);transition:background .2s,border-color .2s}.cloze-word:focus{outline:2px solid var(--green);outline-offset:2px}.cloze-word.accepted{background:#e5f3d9;border-color:#69984b;color:#315326}.cloze-card.complete{background:#f4f9ef;border-color:#a4bd8e}.cs-subject .cloze-card.complete{background:#f2f5ff}.cs-subject .cloze-word.accepted{background:#e0e9ff;border-color:#6c83ba;color:#283f74}@media(max-width:760px){.cloze-card{padding:14px}.cloze-sentence{font-size:15px}}
 .lesson-diagram{margin:22px 0 24px;padding:18px;background:#ffffffb8;border:1px solid #d9e3d2;border-radius:12px}.lesson-diagram svg{display:block;width:100%;height:auto;max-width:720px;margin:auto}.lesson-diagram figcaption{font-size:13px;line-height:1.7;color:#41584b;margin-top:12px}.difficulty-label{display:inline-flex;align-items:center;padding:5px 10px;border-radius:6px;background:#fff0df;color:#8b4c13;font-size:12px;font-weight:700;margin:8px 0}.cs-subject .lesson-diagram{background:#ffffffbd;border-color:#dbe0f0}@media(max-width:760px){.lesson-diagram{padding:10px;margin:18px 0}.lesson-diagram figcaption{font-size:12px}}
+.session-sidebar-toggle{display:none;flex-shrink:0;width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:white;color:var(--green);align-items:center;justify-content:center;margin-right:14px}.session-sidebar-toggle span{font-size:30px;line-height:1}.session-active .session-sidebar-toggle{display:inline-flex}.sidebar{transition:transform .28s cubic-bezier(.22,1,.36,1)}.main{transition:margin-left .28s cubic-bezier(.22,1,.36,1),width .28s cubic-bezier(.22,1,.36,1)}.sidebar-collapsed .sidebar{transform:translateX(-100%);pointer-events:none;visibility:hidden}.sidebar-collapsed .main{margin-left:0;width:100%}@media(max-width:760px){.sidebar-collapsed .sidebar{transform:translateY(100%)}.sidebar-collapsed .main{padding-bottom:0}.session-active .mobile-brand{font-size:15px}.session-sidebar-toggle{margin-right:10px}}@media(prefers-reduced-motion:reduce){.sidebar,.main{transition:none}}
 
 /* Motion supports orientation and feedback without delaying answers. */
 :root{--ease-out:cubic-bezier(.22,1,.36,1);--ease-soft:cubic-bezier(.2,.7,.3,1)}
@@ -1048,23 +1049,17 @@ function clozeState(q){
 }
 function renderCloze(q){
  const s=clozeState(q),i=s.active||0,card=q.cards[i],complete=s.accepted[i].every(Boolean);
- return '<div class="cloze-round"><p class="hint">Type the missing words. Correct words check automatically.</p><p id="cloze-count" role="status">Definition '+(i+1)+' of 3</p><section class="cloze-card '+(complete?'complete':'')+'" data-cloze-card="'+i+'"><h3>'+(card.label?escapeHTML(card.label):'Complete the definition')+'</h3><p class="cloze-sentence">'+card.parts.map((part,j)=>escapeHTML(part)+(j<card.answers.length?'<input type="text" class="cloze-word '+(s.accepted[i][j]?'accepted':'')+'" data-cloze="'+i+'" data-word="'+j+'" aria-label="Definition '+(i+1)+', missing word '+(j+1)+'" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60" style="width:'+Math.max(7,card.answers[j].length+2)+'ch" value="'+escapeHTML(s.values[i][j])+'" '+(session.answered||s.accepted[i][j]?'readonly':'')+'>':'')).join('')+'</p></section>'+(!session.answered?(complete?'<p class="hint" role="status">That’s right.</p><button type="button" class="btn" id="next-cloze-definition">Next definition</button>':'<button type="button" class="btn light" id="reveal-cloze">Reveal words</button>'):'')+'</div>';
-}
-function nextClozeDefinition(){
- if(!session||session.kind!=='learn'||view!=='session'||session.phase==='lesson'||session.answered)return false;
- const q=currentQuestion();if(q.type!=='cloze')return false;const s=clozeState(q);
- if(!s.accepted[s.active].every(Boolean)||s.active>=q.cards.length-1)return false;
- s.active++;questionView();document.querySelector('.cloze-word:not([readonly])')?.focus();return true;
+ return '<div class="cloze-round"><p class="hint">Type the missing words. Correct words check automatically.</p><section class="cloze-card '+(complete?'complete':'')+'" data-cloze-card="'+i+'"><h3>'+(card.label?escapeHTML(card.label):'Complete the definition')+'</h3><p class="cloze-sentence">'+card.parts.map((part,j)=>escapeHTML(part)+(j<card.answers.length?'<input type="text" class="cloze-word '+(s.accepted[i][j]?'accepted':'')+'" data-cloze="'+i+'" data-word="'+j+'" aria-label="Definition '+(i+1)+', missing word '+(j+1)+'" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60" style="width:'+Math.max(7,card.answers[j].length+2)+'ch" value="'+escapeHTML(s.values[i][j])+'" '+(session.answered||s.accepted[i][j]?'readonly':'')+'>':'')).join('')+'</p></section>'+(!session.answered?'<button type="button" class="btn light" id="reveal-cloze">Reveal words</button>':'')+'</div>';
 }
 const originalRenderResponse=renderResponse;renderResponse=q=>q.type==='cloze'?renderCloze(q):originalRenderResponse(q);
-const originalTypedFeedback=typedFeedback;typedFeedback=function(q){if(q.type!=='cloze')return originalTypedFeedback(q);const r=session.results.at(-1);return '<div class="feedback '+(r?.correct?'':'wrong')+'" role="status"><strong>'+(r?.correct?'All three definitions complete.':'Words revealed — this round counts as wrong.')+'</strong><p>'+ (r?.correct?'Ready for the next question.':'Read the completed definition before continuing.')+'</p></div>';};
+const originalTypedFeedback=typedFeedback;typedFeedback=function(q){if(q.type!=='cloze')return originalTypedFeedback(q);const r=session.results.at(-1);return '<div class="feedback '+(r?.correct?'':'wrong')+'" role="status"><strong>'+(r?.correct?'Definition complete.':'Words revealed.')+'</strong><p>'+ (r?.correct?'Ready for the next question.':'Read the completed definition before continuing.')+'</p></div>';};
 function finishCloze(reveal=false){
  if(!session||session.kind!=='learn'||view!=='session'||session.phase==='lesson'||session.answered)return;
  const q=currentQuestion();if(q.type!=='cloze')return;const s=clozeState(q);
  if(!reveal&&!s.accepted.every(row=>row.every(Boolean)))return;
  s.revealed=reveal;session.choice=s.values.map(row=>row.join(', ')).join('; ');session.answered=true;
- const correct=!reveal,previous=progress.answers[q.id]||{};session.results.push({...q,choice:reveal?'Words revealed':session.choice,correct});
- progress.attempts++;if(correct)progress.correct++;progress.answers[q.id]={correct:!!(previous.correct||correct),lastCorrect:correct,attempts:(previous.attempts||0)+1};
+ const skillId=q.clozeSkillId||q.id,correct=!reveal,previous=progress.answers[skillId]||{};session.results.push({...q,choice:reveal?'Words revealed':session.choice,correct});
+ progress.attempts++;if(correct)progress.correct++;progress.answers[skillId]={correct:!!(previous.correct||correct),lastCorrect:correct,attempts:(previous.attempts||0)+1};
  if(reveal){s.values=q.cards.map(c=>[...c.answers]);s.accepted=q.cards.map(c=>c.answers.map(()=>true));}
  persist();Sound.play(correct?'correct':'incorrect');questionView();
 }
@@ -1076,13 +1071,26 @@ function acceptCloze(input){
  s.accepted[i][j]=true;input.value=q.cards[i].answers[j];s.values[i][j]=input.value;input.readOnly=true;input.classList.add('accepted');
  if(s.accepted[i].every(Boolean)){
   if(s.accepted.every(row=>row.every(Boolean))){finishCloze();return;}
-  Sound.play('correct');questionView();document.querySelector('#next-cloze-definition')?.focus();return;
+  return;
  }
  const next=document.querySelector('.cloze-word:not([readonly])');next?.focus();
 }
 document.addEventListener('input',event=>{if(event.target.dataset?.cloze!==undefined&&!event.isComposing)acceptCloze(event.target);});
 document.addEventListener('compositionend',event=>{if(event.target.dataset?.cloze!==undefined)acceptCloze(event.target);});
-document.addEventListener('click',event=>{const button=event.target.closest('button');if(!button||button.disabled)return;if(button.id==='reveal-cloze')finishCloze(true);if(button.id==='next-cloze-definition')nextClozeDefinition();});
+document.addEventListener('click',event=>{const button=event.target.closest('button');if(!button||button.disabled)return;if(button.id==='reveal-cloze')finishCloze(true);});
+
+function spaceDefinitionQuestions(queue){
+ const round=queue.find(q=>q.type==='cloze');if(!round)return queue;
+ const ordinary=queue.filter(q=>q.type!=='cloze'&&q.type!=='gap');
+ const easy=ordinary.filter(q=>q.difficulty!=='hard'),hard=ordinary.filter(q=>q.difficulty==='hard');
+ const cards=round.cards.map(card=>{
+  let hash=2166136261;for(const char of card.text)hash=Math.imul(hash^char.charCodeAt(0),16777619)>>>0;
+  return {...round,id:round.id+'-cloze-'+hash,clozeSkillId:round.id,cards:[card],prompt:'Complete the definition',answer:card.text,explain:card.text};
+ });
+ const slots=cards.map((_,i)=>Math.max(2,Math.round((i+1)*easy.length/cards.length)));
+ const result=[];easy.forEach((q,i)=>{result.push(q);cards.forEach((card,j)=>{if(slots[j]===i+1)result.push(card);});});
+ return [...result,...hard];
+}
 
 function rushEquations(){return "";}
 function rushQuestion(q){return q;}
@@ -1396,7 +1404,7 @@ const Suika=(()=>{
   if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();world.setAim(world.aim+(e.key==='ArrowLeft'?-12:12));}
   if(e.key===' '||e.key==='Enter'){e.preventDefault();e.stopPropagation();drop(true);}
  });
- return {start,render,answer,next,drop,stop,summary,snapshot,openQuiz,returnToGame,getWorld:()=>world};
+ return {start,render,answer,next,drop,stop,summary,snapshot,openQuiz,returnToGame,resetNavigationClock:()=>{lastTime=0;accumulator=0;clearDrag();},getWorld:()=>world};
 })();
 
 
@@ -1426,6 +1434,34 @@ capacitors:diagramFigure('How a capacitor stores charge',D(75,135,290,135)+D(350
 };
 function lessonDiagram(t,index){return index===0?(LESSON_DIAGRAMS[t.id]||''):'';}
 
+/* Shared session navigation, for both labs and every session mode. */
+let sidebarSession=null,sidebarOpen=true;
+function sessionIsActive(){return view==='session'&&!!session;}
+function lessonQuestionCount(t){const pool=questionsFor(t);return mode==='learn'&&pool.some(q=>q.type==='cloze')?pool.length+2-pool.filter(q=>q.type==='gap').length:pool.length;}
+function syncSessionNavigation(){
+ const active=sessionIsActive();if(active&&sidebarSession!==session){sidebarSession=session;sidebarOpen=false;}if(!active){sidebarSession=null;sidebarOpen=true;}
+ const app=$('#app');app?.classList.toggle('session-active',active);app?.classList.toggle('sidebar-collapsed',active&&!sidebarOpen);
+ const sidebar=$('.sidebar');if(sidebar){sidebar.inert=active&&!sidebarOpen;sidebar.setAttribute('aria-hidden',String(active&&!sidebarOpen));}
+ const button=$('#session-sidebar-toggle');if(button){button.setAttribute('aria-expanded',String(sidebarOpen));button.setAttribute('aria-label',sidebarOpen?'Hide sidebar':'Open sidebar');button.title=sidebarOpen?'Hide sidebar':'Open sidebar';button.innerHTML='<span aria-hidden="true">'+(sidebarOpen?'‹':'›')+'</span>';}
+}
+function confirmSessionExit(){
+ if(!sessionIsActive())return true;
+ const pending=session,start=Date.now();const leave=confirm('Exit this session? You will lose your place and current session progress. Answers and exam drafts already saved on this device will be kept.');
+ if(!leave&&session===pending){
+  const elapsed=Date.now()-start;
+  if(session.kind==='rush'){
+   session.ends+=elapsed;
+   if(session.advanceAt){session.advanceAt+=elapsed;clearTimeout(autoNext);autoNext=setTimeout(nextQuestion,Math.max(0,session.advanceAt-Date.now()));}
+  }
+  if(session.kind==='suika'){if(session.retryAt)session.retryAt+=elapsed;session.inputAfter=Math.max(Date.now()+200,(session.inputAfter||0)+elapsed);Suika.resetNavigationClock();}
+ }
+ return leave;
+}
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('button');if(button?.id==='session-sidebar-toggle'){sidebarOpen=!sidebarOpen;syncSessionNavigation();return;}
+ const link=event.target.closest?.('a');if(link&&(link.classList?.contains('all-labs')||link.classList?.contains('mobile-brand'))&&!confirmSessionExit())event.preventDefault();
+},true);
+
 const $=s=>document.querySelector(s);
 const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const KEY=COURSE.key;
@@ -1446,7 +1482,7 @@ const overall=()=>TOPICS.reduce((s,t)=>s+completed(t),0);
 const totalMarks=t=>t.exam.parts.reduce((s,p)=>s+p[1].length,0);
 const examMarks=t=>{const ex=progress.exams[t.id];return ex?Object.values(ex.marks||{}).filter(Boolean).length:0;};
 const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
-function shell(content){const active=view==='setup'?mode:view==='session'?(session?.kind==='exam'?'exam':(session?.kind==='rush'||session?.kind==='suika')?'rush':'learn'):view;
+function shell(content){syncSessionNavigation();const active=view==='setup'?mode:view==='session'?(session?.kind==='exam'?'exam':(session?.kind==='rush'||session?.kind==='suika')?'rush':'learn'):view;
  const footer=`<footer class="footer"><span>Independent of ${COURSE.board}, Seneca & Cognito</span></footer>`;
  const existing=$('.main .content');
  if(existing?.isConnected){
@@ -1455,9 +1491,10 @@ function shell(content){const active=view==='setup'?mode:view==='session'?(sessi
    const nextTrack=$('#session-track');
    if(previousWidth&&nextTrack&&session?.kind==='learn'&&!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)nextTrack.animate?.([{width:previousWidth},{width:nextTrack.style.width}],{duration:420,easing:'cubic-bezier(.22,1,.36,1)'});
    document.querySelectorAll('.nav [data-nav]').forEach(b=>{const isActive=b.dataset.nav===active;b.classList.toggle('active',isActive);if(isActive)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
-   return;
+   syncSessionNavigation();return;
  }
- $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="brand-icon">${icon(COURSE.icon)}</span>${COURSE.short}<span style="color:#81a85b">.</span></div><div class="course-tag">${COURSE.tag}</div><a class="all-labs" href="/">← All labs</a><nav class="nav" aria-label="Main navigation">${[['dashboard','home','Overview'],['learn','book','Learn & quiz'],['exam','exam','Exam practice'],['rush','bolt','Question Rush'],['progress','chart','My progress']].map(([id,ic,label])=>`<button data-nav="${id}" class="${active===id?'active':''}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav></aside><main class="main"><header class="topbar"><a class="mobile-brand" href="/"><span class="brand-icon">${icon(COURSE.icon)}</span>${COURSE.short}.</a><div class="top-right">${Sound.markup()}<a class="small-link" href="${COURSE.spec}" target="_blank" rel="noopener">${COURSE.board} specification ↗</a></div></header><div class="content">${content}<footer class="footer"><span>Independent of ${COURSE.board}, Seneca & Cognito</span></footer>${!storageOK?'<p class="hint">Browser storage is unavailable. Your progress will last for this visit only.</p>':''}</div></main></div>`;
+ $('#app').innerHTML=`<div class="shell"><aside class="sidebar" id="session-sidebar"><div class="brand"><span class="brand-icon">${icon(COURSE.icon)}</span>${COURSE.short}<span style="color:#81a85b">.</span></div><div class="course-tag">${COURSE.tag}</div><a class="all-labs" href="/">← All labs</a><nav class="nav" aria-label="Main navigation">${[['dashboard','home','Overview'],['learn','book','Learn & quiz'],['exam','exam','Exam practice'],['rush','bolt','Question Rush'],['progress','chart','My progress']].map(([id,ic,label])=>`<button data-nav="${id}" class="${active===id?'active':''}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav></aside><main class="main"><header class="topbar"><button type="button" id="session-sidebar-toggle" class="session-sidebar-toggle" aria-controls="session-sidebar" aria-expanded="false" aria-label="Open sidebar"><span aria-hidden="true">›</span></button><a class="mobile-brand" href="/"><span class="brand-icon">${icon(COURSE.icon)}</span>${COURSE.short}.</a><div class="top-right">${Sound.markup()}<a class="small-link" href="${COURSE.spec}" target="_blank" rel="noopener">${COURSE.board} specification ↗</a></div></header><div class="content">${content}<footer class="footer"><span>Independent of ${COURSE.board}, Seneca & Cognito</span></footer>${!storageOK?'<p class="hint">Browser storage is unavailable. Your progress will last for this visit only.</p>':''}</div></main></div>`;
+ syncSessionNavigation();
 }
 function intro(eyebrow,title,subtitle){return `<div class="intro"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${subtitle}</p></div></div>`;}
 function homeScreen(){
@@ -1473,13 +1510,13 @@ shell(`<div class="intro"><div><h1>Overview</h1></div></div>
 <div class="section-title"><h2>Find your revision rhythm</h2></div><div class="mode-grid">${[['learn','book','Learn & quiz','Understand the idea, then put it into practice with guided questions.'],['exam','exam','Exam practice','Go deeper with multi-part questions, worked answers and mark schemes.'],['rush','bolt','Question Rush','Knowledge questions for quick recall, or fruit-drop play with the full question bank.']].map(([id,ic,title,desc])=>`<button class="mode-card" data-nav="${id}"><span class="icon">${icon(ic)}</span><h3>${title}</h3><p>${desc}</p></button>`).join('')}</div>
 <div class="section-title"><h2>Explore your course</h2><button class="btn ghost" data-nav="learn">All topics <span>→</span></button></div><div class="module-grid">${MODULES.map(m=>{let ts=TOPICS.filter(t=>t.module===m.id),count=ts.reduce((s,t)=>s+completed(t),0),total=ts.reduce((sum,t)=>sum+t.questions.length,0);return `<button class="module-card" data-module="${m.id}"><div class="module-num">${COURSE.group} ${String(m.id).padStart(2,'0')}</div><h3>${m.title}</h3><small>${ts.length} topics · ${total} quiz questions</small><div class="track"><i style="width:${count/total*100}%"></i></div><small>${count} of ${total} answered correctly</small></button>`;}).join('')}</div>`);}
 function filtered(){return TOPICS.filter(t=>(moduleFilter==='all'||t.module===Number(moduleFilter))&&`${t.title} ${t.code}`.toLowerCase().includes(query.toLowerCase()));}
-function topicRows(){let ts=filtered();return ts.length?MODULES.filter(m=>ts.some(t=>t.module===m.id)).map(m=>`<h2 class="module-heading">${COURSE.group} ${m.id} <span style="padding:0 5px">/</span> ${m.full}</h2><div class="topic-list">${ts.filter(t=>t.module===m.id).map(t=>`<label class="topic-row"><input type="checkbox" data-topic="${t.id}" ${selected.has(t.id)?'checked':''}><div><h3>${t.title}</h3><p>${t.code} · ${mode==='exam'?`${totalMarks(t)} marks · original exam-style set`:`${questionsFor(t).length} questions · ${mode==='rush'?(rushVariant==='normal'?'knowledge only':'knowledge + calculations'):'choice + typed recall'}`}</p></div><span class="topic-percent">${mode==='exam'?(progress.exams[t.id]?.submitted?'✓':''):percentage(t)?percentage(t)+'%':''}</span></label>`).join('')}</div>`).join(''):'<div class="empty">No topics match your search. Try a different word or module.</div>';}
-function selectionText(){let n=selected.size,count=TOPICS.filter(t=>selected.has(t.id)).reduce((sum,t)=>sum+questionsFor(t).length,0);return `<div><p><strong>${n} topic${n===1?'':'s'} selected</strong></p><small>${mode==='exam'?`${n} practice set${n===1?'':'s'}`:`${count} questions in your ${mode==='rush'?'rush pool':'learning session'}`}</small></div><button class="btn ${mode==='rush'?'orange':''}" id="start" ${!n?'disabled':''}>${mode==='rush'?(rushVariant==='suika'?'Start Suika mode':'Start the rush'):mode==='exam'?'Start practice':'Start learning'} <span>→</span></button>`;}
+function topicRows(){let ts=filtered();return ts.length?MODULES.filter(m=>ts.some(t=>t.module===m.id)).map(m=>`<h2 class="module-heading">${COURSE.group} ${m.id} <span style="padding:0 5px">/</span> ${m.full}</h2><div class="topic-list">${ts.filter(t=>t.module===m.id).map(t=>`<label class="topic-row"><input type="checkbox" data-topic="${t.id}" ${selected.has(t.id)?'checked':''}><div><h3>${t.title}</h3><p>${t.code} · ${mode==='exam'?`${totalMarks(t)} marks · original exam-style set`:`${lessonQuestionCount(t)} questions · ${mode==='rush'?(rushVariant==='normal'?'knowledge only':'knowledge + calculations'):'choice + typed recall'}`}</p></div><span class="topic-percent">${mode==='exam'?(progress.exams[t.id]?.submitted?'✓':''):percentage(t)?percentage(t)+'%':''}</span></label>`).join('')}</div>`).join(''):'<div class="empty">No topics match your search. Try a different word or module.</div>';}
+function selectionText(){let n=selected.size,count=TOPICS.filter(t=>selected.has(t.id)).reduce((sum,t)=>sum+lessonQuestionCount(t),0);return `<div><p><strong>${n} topic${n===1?'':'s'} selected</strong></p><small>${mode==='exam'?`${n} practice set${n===1?'':'s'}`:`${count} questions in your ${mode==='rush'?'rush pool':'learning session'}`}</small></div><button class="btn ${mode==='rush'?'orange':''}" id="start" ${!n?'disabled':''}>${mode==='rush'?(rushVariant==='suika'?'Start Suika mode':'Start the rush'):mode==='exam'?'Start practice':'Start learning'} <span>→</span></button>`;}
 function setup(){const words={learn:['LEARN & QUIZ','Understand it. Then answer it.','Pick your topics for bite-sized lessons and questions with instant explanations.'],exam:['EXAM PRACTICE','Turn knowledge into marks.','Work through original multi-part questions, then self-mark with worked solutions.'],rush:['QUESTION RUSH','Quick thinking. Stronger recall.','Normal Rush tests knowledge without calculator work. Suika keeps the full multiple-choice bank, including calculations.']};shell(`${intro(...words[mode])}${mode==='rush'?rushControls():mode==='exam'?'<div class="settings"><span class="icon">'+icon('exam')+'</span><span>Write your answers first. Reveal the mark scheme when ready, then check the marks you earned.</span></div>':''}<div class="topic-tools"><input class="search" id="search" placeholder="Search topics or specification codes" aria-label="Search topics" value="${escapeHTML(query)}"><select id="module-filter" aria-label="Filter module"><option value="all">All modules</option>${MODULES.map(m=>`<option value="${m.id}" ${String(moduleFilter)===String(m.id)?'selected':''}>${COURSE.group} ${m.id} · ${m.title}</option>`).join('')}</select><button class="btn light" id="select-visible">Select shown</button><button class="btn light" id="clear-selection">Clear</button></div><div id="topic-rows">${topicRows()}</div><div class="selection-bar" id="selection-bar">${selectionText()}</div>`);}
 function updateSelection(){const el=$('#selection-bar');if(el)el.innerHTML=selectionText();}
 function stopTimers(){clearInterval(ticker);clearTimeout(autoNext);ticker=autoNext=null;Suika.stop();}
-function navigate(dest){stopTimers();session=null;query='';moduleFilter='all';if(['learn','rush','exam'].includes(dest)){mode=dest;view='setup';}else view=dest;render();window.scrollTo(0,0);}
-function render(){if(view==='home')homeScreen();else if(view==='dashboard')dashboard();else if(view==='setup')setup();else if(view==='progress')showProgress();else if(view==='session')session.kind==='suika'?Suika.render():session.kind==='exam'?examView():questionView();else if(view==='summary')summaryView();}
+function navigate(dest){if(!confirmSessionExit())return false;stopTimers();session=null;query='';moduleFilter='all';if(['learn','rush','exam'].includes(dest)){mode=dest;view='setup';}else view=dest;render();window.scrollTo(0,0);}
+function render(){syncSessionNavigation();if(view==='home')homeScreen();else if(view==='dashboard')dashboard();else if(view==='setup')setup();else if(view==='progress')showProgress();else if(view==='session')session.kind==='suika'?Suika.render():session.kind==='exam'?examView():questionView();else if(view==='summary')summaryView();}
 function versionFor(skill,topicId){
   progress.variantTurns ||= {};
   const turn=progress.variantTurns[skill.id]||0;
@@ -1487,7 +1524,7 @@ function versionFor(skill,topicId){
   progress.variantTurns[skill.id]=turn+1;
   const prepared={id:skill.id,topic:topicId,difficulty:skill.difficulty||'practice',prompt:variant.prompt,...variant,options:variant.options?shuffle(variant.options):undefined,learn:skill.learn||''};return mode==='rush'?rushQuestion(prepared):prepared;
 }
-function begin(){if(!selected.size)return;if(mode==='rush'&&rushVariant==='suika'){Suika.start(TOPICS.filter(t=>selected.has(t.id)));return;}stopTimers();const ts=TOPICS.filter(t=>selected.has(t.id));progress.lastTopic=ts[0].id;view='session';if(mode==='exam'){session={kind:'exam',topics:ts.map(t=>t.id),index:0};examView();}else{let queue=ts.flatMap(t=>questionsFor(t).map(q=>versionFor(q,t.id)));if(mode==='rush')queue=shuffle(queue);session={kind:mode,queue,index:0,results:[],phase:mode==='learn'?'lesson':'question',seen:[],answered:false,choice:null,ends:Date.now()+duration*1000,seconds:duration};persist();questionView();if(mode==='rush')ticker=setInterval(tick,200);}persist();window.scrollTo(0,0);}
+function begin(){if(!selected.size)return;if(mode==='rush'&&rushVariant==='suika'){Suika.start(TOPICS.filter(t=>selected.has(t.id)));return;}stopTimers();const ts=TOPICS.filter(t=>selected.has(t.id));progress.lastTopic=ts[0].id;view='session';if(mode==='exam'){session={kind:'exam',topics:ts.map(t=>t.id),index:0};examView();}else{let queue=ts.flatMap(t=>{const items=questionsFor(t).map(q=>versionFor(q,t.id));return mode==='learn'?spaceDefinitionQuestions(items):items;});if(mode==='rush')queue=shuffle(queue);session={kind:mode,queue,index:0,results:[],phase:mode==='learn'?'lesson':'question',seen:[],answered:false,choice:null,ends:Date.now()+duration*1000,seconds:duration};persist();questionView();if(mode==='rush')ticker=setInterval(tick,200);}persist();window.scrollTo(0,0);}
 function currentQuestion(){return session.queue[session.index];}
 function lessonView(t){
  const notes=t.lessonSections?t.lessonSections.map((section,i)=>'<section class="lesson-section"><h3>'+escapeHTML(section.title)+'</h3><ul>'+section.points.map(point=>'<li>'+escapeHTML(point)+'</li>').join('')+'</ul></section>'+lessonDiagram(t,i)).join(''):t.lesson.map(p=>'<p>'+p+'</p>').join('');
