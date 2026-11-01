@@ -1698,7 +1698,10 @@ function renderCloze(q){
  return '<div class="cloze-round"><p class="hint">Type the missing words. Correct words check automatically.</p><section class="cloze-card '+(complete?'complete':'')+'" data-cloze-card="'+i+'"><h3>'+(card.label?escapeHTML(card.label):'Complete the definition')+'</h3><p class="cloze-sentence">'+card.parts.map((part,j)=>escapeHTML(part)+(j<card.answers.length?'<input type="text" class="cloze-word '+(s.accepted[i][j]?'accepted':'')+'" data-cloze="'+i+'" data-word="'+j+'" aria-label="Definition '+(i+1)+', missing word '+(j+1)+'" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60" style="width:'+Math.max(7,card.answers[j].length+2)+'ch" value="'+escapeHTML(s.values[i][j])+'" '+(session.answered||s.accepted[i][j]?'readonly':'')+'>':'')).join('')+'</p></section>'+(!session.answered?'<button type="button" class="btn light" id="reveal-cloze">Reveal words</button>':'')+'</div>';
 }
 const originalRenderResponse=renderResponse;renderResponse=q=>q.type==='cloze'?renderCloze(q):originalRenderResponse(q);
-const originalTypedFeedback=typedFeedback;typedFeedback=function(q){if(q.type!=='cloze')return originalTypedFeedback(q);const r=session.results.at(-1);return '<div class="feedback '+(r?.correct?'':'wrong')+'" role="status"><strong>'+(r?.correct?'Definition complete.':'Words revealed.')+'</strong><p>'+ (r?.correct?'Ready for the next question.':'Read the completed definition before continuing.')+'</p></div>';};
+const originalTypedFeedback=typedFeedback;typedFeedback=function(q){
+ if(q.type!=='cloze')return originalTypedFeedback(q);const r=session.results.at(-1);
+ return '<div class="feedback '+(r?.correct?'':'wrong')+'" role="status"><strong>'+(r?.correct?'That’s right.':'Words revealed.')+'</strong><p class="model-definition">'+escapeHTML(q.answer)+'</p>'+(q.explain&&q.explain!==q.answer?'<p>'+escapeHTML(q.explain)+'</p>':'')+'</div>';
+};
 function finishCloze(reveal=false){
  if(!session||session.kind!=='learn'||view!=='session'||session.phase==='lesson'||session.answered)return;
  const q=currentQuestion();if(q.type!=='cloze')return;const s=clozeState(q);
@@ -1731,11 +1734,16 @@ function spaceDefinitionQuestions(queue){
  const easy=ordinary.filter(q=>q.difficulty!=='hard'),hard=ordinary.filter(q=>q.difficulty==='hard');
  const cards=round.cards.map(card=>{
   let hash=2166136261;for(const char of card.text)hash=Math.imul(hash^char.charCodeAt(0),16777619)>>>0;
-  return {...round,id:round.id+'-cloze-'+hash,clozeSkillId:round.id,cards:[card],prompt:'Complete the definition',answer:card.text,explain:card.text};
+  return {...round,id:round.id+'-cloze-'+hash,clozeSkillId:round.id,cards:[card],prompt:'Complete the definition',answer:card.text,explain:definitionExplanation(card,round.topic)};
  });
  const slots=cards.map((_,i)=>Math.max(2,Math.round((i+1)*easy.length/cards.length)));
  const result=[];easy.forEach((q,i)=>{result.push(q);cards.forEach((card,j)=>{if(slots[j]===i+1)result.push(card);});});
  return [...result,...hard];
+}
+
+function definitionExplanation(card,topicId){
+ const topic=findTopic(topicId),model=topic?.questions.find(q=>q.type==='definition'&&q.answer===card.text);
+ return model?.keyPoints?.length?'The essential ideas are: '+model.keyPoints.map(p=>p.text).join('; ')+'.':card.text;
 }
 
 /* Equation hints transcribed from OCR Physics A H156/H556 booklet (2025).
@@ -2573,6 +2581,143 @@ capacitors:diagramFigure('How a capacitor stores charge',D(75,135,290,135)+D(350
 };
 function lessonDiagram(t,index){return index===0?(LESSON_DIAGRAMS[t.id]||''):'';}
 
+/* Context variants stay in their existing family: one version per lesson. */
+const PHYSICS_CONTEXTS={
+planning:[
+[0,'A student adjusts the length of a pendulum before timing it. What is the independent variable?','Pendulum length','The measured period','The stopwatch reading','The average result','The length is deliberately changed; the period is measured in response.'],
+[1,'A student changes lamp voltage and records the current. Which is the dependent variable?','Current','The chosen voltage','The wire material','The power supply setting','Current is the measured response to the voltage chosen by the student.']],
+analysis:[
+[0,'A student changes the load and measures spring extension. Which quantity belongs on the horizontal axis?','Load','Extension','Both must use the vertical axis','Neither belongs on a graph','Plot the variable deliberately changed, load, horizontally.'],
+[1,'A graph rises steeply. Which ratio measures its slope?','Rise divided by run','Run divided by rise','Rise multiplied by run','The largest vertical reading alone','Gradient compares vertical change with the corresponding horizontal change.']],
+units:[
+[0,'A stopwatch measures the time of a fall. Which is the SI base unit for its result?','Second','Metre','Kelvin','Newton','Time is measured in seconds in SI.'],
+[1,'A balance displays grams. Which unit should you convert to before an SI force calculation?','Kilograms','Newtons','Joules','Centimetres','An SI force calculation uses mass in kilograms.']],
+uncertainty:[
+[0,'A thermometer result is (18.0 ± 0.5) °C. What is its absolute uncertainty?','0.5 °C','18.0 °C','0.5%','18.5%','The value after ± is the absolute uncertainty; it retains the measured unit.'],
+[1,'Two measurements have the same absolute uncertainty. Which has the larger percentage uncertainty?','The smaller measured value','The larger measured value','They must have equal percentage uncertainty','The measurement with the longer unit symbol','The same absolute uncertainty is a greater fraction of a smaller reading.']],
+vectors:[
+[0,'A weather report says wind speed and direction. Why is the wind velocity a vector?','It specifies magnitude and direction','It specifies temperature','It has no magnitude','Every measured quantity is a vector','A vector requires both magnitude and direction.'],
+[1,'A runner’s watch shows speed but no direction. Which type of quantity is displayed?','A scalar','A vector','A force','An acceleration necessarily','Speed describes magnitude only, so it is a scalar.']],
+motion:[
+[0,'Two walkers cover the same distance. The first takes less time. Who has the greater average speed?','The first walker','The second walker','They must have equal speed','The heavier walker necessarily','Average speed is distance divided by time; the same distance in less time gives greater speed.'],
+[1,'A cyclist’s velocity changes while a parked bicycle stays still. Which is accelerating?','The cyclist','Only the parked bicycle','Both must accelerate equally','Neither can accelerate','Acceleration means a change in velocity per unit time.']],
+forces:[
+[0,'A suitcase is taken to the Moon. Which quantity changes because the gravitational field is weaker?','Its weight','Its mass','Its number of atoms','Its amount of matter','Weight depends on gravitational field strength; mass does not.'],
+[1,'A lift travels upwards at constant velocity. What is its resultant force?','Zero','Upwards because it is moving up','Downwards because it has weight','Equal to its speed','Constant velocity means zero acceleration, so the forces balance.']],
+energy:[
+[0,'A stationary trolley starts rolling. Which energy store increases?','Kinetic','Chemical necessarily','Nuclear necessarily','Elastic necessarily','Motion is associated with kinetic energy.'],
+[1,'Two lamps transfer the same energy, but one does it faster. Which has the greater power?','The faster lamp','The slower lamp','Both must have equal power','The cooler lamp necessarily','Power is energy per unit time. The same transfer in less time means greater power.']],
+materials:[
+[0,'A wire is 1.00 m long before loading and 1.01 m afterwards. Which subtraction gives extension?','1.01 m − 1.00 m','1.01 m + 1.00 m','1.00 m ÷ 1.01 m','1.01 m × 1.00 m','Extension is the increase in length: final length minus original length.'],
+[1,'A spring returns fully to its original length after a load is removed. Which conclusion follows?','Its deformation was elastic','Its deformation was permanently plastic','Its strain had a unit of newtons','Its mass became zero','Elastic deformation is reversed when the force is removed.']],
+momentum:[
+[0,'Two trolleys move at the same velocity. Which has the greater momentum?','The trolley with greater mass','The trolley with smaller mass','Both must have equal momentum','Neither has momentum','Momentum equals mass times velocity, so a larger mass gives larger momentum at the same velocity.'],
+[1,'A trolley reverses direction at the same speed. Why does its momentum change?','Momentum includes direction','Its mass must double','Speed has a direction','Momentum is always zero','Momentum is a vector, so reversing velocity reverses its direction.']],
+current:[
+[0,'More charge passes a point each second after a switch is closed. What has increased?','Current','Resistance necessarily','Mass per unit volume','The charge of each electron','Current measures the amount of charge passing per unit time.'],
+[1,'A meter displays a reading in A. Which quantity is it measuring?','Current','Charge','Resistance','Potential difference','A stands for ampere, the unit of current.']],
+resistance:[
+[0,'Two resistors have the same voltage across them. Which carries less current?','The higher-resistance resistor','The lower-resistance resistor','Both must carry equal current','The physically longer one regardless of material','At fixed voltage, current is inversely proportional to resistance.'],
+[1,'A component is rated at 20 Ω. Which property does this describe?','Resistance','Charge','Current','Energy','The ohm, symbol Ω, measures resistance.']],
+circuits:[
+[0,'You want to measure current through a lamp. Where should the ammeter go?','In the same current path as the lamp','Across the lamp’s terminals','Across the battery with no resistance','Outside the circuit','An ammeter must be in series with the component whose current is measured.'],
+[1,'You want the voltage across a motor while it runs. How should you connect the voltmeter?','Across the motor’s two terminals','In series instead of the motor','Across an unconnected piece of plastic','Only to one motor terminal','Potential difference is measured between two points, so the voltmeter goes across the motor.']],
+waves:[
+[0,'A cork bobs up and down as a wave passes. What travels onward while the cork stays near its original position?','Energy','The cork must travel with the wave','All the water permanently','The cork’s mass','The disturbance transfers energy while particles oscillate locally.'],
+[1,'A vibrating ruler moves farther from its rest position but keeps the same rhythm. What has increased?','Amplitude','Frequency','Period necessarily','Wave speed necessarily','Greater maximum displacement from equilibrium means greater amplitude.']],
+quantum:[
+[0,'Very faint light is detected in discrete energy packets. What are these packets called?','Photons','Protons','Neutrons','Alpha particles','Electromagnetic radiation transfers energy in discrete quanta called photons.'],
+[1,'A blue photon has a higher frequency than a red photon. Which has more energy?','The blue photon','The red photon','Both must have equal energy','Neither carries energy','Photon energy increases with frequency according to E = hf.']],
+thermal:[
+[0,'A student substitutes a temperature into pV = nRT. Which temperature scale is required?','Kelvin','Degrees Celsius','Degrees Fahrenheit','Any scale without conversion','Ideal gas equations use absolute temperature in kelvin.'],
+[1,'A gas warms up without changing its molecular species. What happens to mean random molecular kinetic energy?','It increases','It decreases','It becomes exactly zero','It stays fixed because molecular mass is unchanged','Mean random kinetic energy increases with absolute temperature.']],
+circular:[
+[0,'A ball moves around a horizontal circle on a string. Which direction must its resultant force point?','Towards the centre','Along the tangent','Away from the centre','In the direction it last moved','Circular motion requires an inward resultant force to change the velocity direction.'],
+[1,'A car rounds a bend at constant speed. Why is its velocity changing?','Its direction changes','Its mass changes','Its speed must increase','Its engine must turn off','Velocity includes direction as well as speed.']],
+oscillations:[
+[0,'A pendulum travels from the left extreme to the right extreme and back. What has it completed?','One oscillation','Half an oscillation','Only a displacement with no cycle','A change in mass','One oscillation is a full cycle returning to the same position and direction of motion.'],
+[1,'A pendulum is released farther from equilibrium, still at a small angle. Which quantity describes its greater maximum displacement?','Amplitude','Period','Frequency','Mass','Amplitude measures the greatest displacement from equilibrium.']],
+gravity:[
+[0,'A small mass is placed near a planet. Which direction is its gravitational force?','Towards the planet','Away from the planet','Along a circular field line','There is no force unless it is charged','Gravity is attractive and acts towards the mass producing the field.'],
+[1,'Two test masses at the same point experience forces proportional to their masses. Which ratio is the same for both?','Force divided by mass','Force multiplied by mass','Mass divided by time','Force divided by charge','Gravitational field strength is force per unit mass at that point.']],
+astro:[
+[0,'A star is several light-years away. What does this statement describe?','Its distance','Its age necessarily','Its emitted power','Its mass','A light-year measures distance, despite containing the word year.'],
+[1,'Two stars emit the same total energy, but one does so in less time. Which has greater luminosity during that interval?','The one emitting it in less time','The one emitting it in more time','They must have equal luminosity','The nearer one necessarily','Luminosity is total radiated power: emitted energy per unit time.']],
+capacitors:[
+[0,'A component stores equal and opposite charges on two insulated plates. Which component is it?','A capacitor','An ammeter','A fuse','A thermistor','A capacitor stores separated charge on its plates and energy in the electric field.'],
+[1,'Two capacitors are at the same voltage. Which stores more charge?','The one with greater capacitance','The one with smaller capacitance','They must store equal charge','The one with greater resistance necessarily','Q = CV, so greater capacitance gives greater stored charge at fixed voltage.']],
+electric:[
+[0,'An electric field arrow points right. Which way does the force on a positive test charge point?','Right','Left','Always upwards','There is no force','Electric field direction is defined by the force on a positive test charge.'],
+[1,'A positive bead is placed near a negatively charged rod. What electric force acts on the bead?','Towards the rod','Away from the rod','No force because the signs differ','A force only if both are positive','Opposite charges attract.']],
+magnetic:[
+[0,'A current in a straight wire is switched on. What is produced around the wire?','A magnetic field','Only a gravitational field change','A stationary wave necessarily','A radioactive nucleus','An electric current produces a magnetic field around the wire.'],
+[1,'A compass is moved around a long straight current-carrying wire. What shape do the field directions trace around it?','Circles centred on the wire','Straight lines away from the wire','Straight lines towards the wire','Only vertical lines everywhere','Magnetic field lines form concentric circles around a straight current-carrying wire.']],
+nuclear:[
+[0,'An electron is removed from an atom. Does this remove a particle from its nucleus?','No: electrons are outside the nucleus','Yes: every electron is a neutron','Yes: every electron is a proton','The nucleus contains only electrons','The nucleus contains protons and neutrons, not atomic electrons.'],
+[1,'Two atoms have different proton numbers. What must be different?','Their chemical elements','Only their temperatures','Only their charge states','Only their neutron numbers','The proton number identifies the chemical element.']],
+medical:[
+[0,'A scan sends pulses of sound too high in frequency for humans to hear. Which imaging method is this?','Ultrasound','X-ray imaging','PET','MRI','Ultrasound uses high-frequency sound pulses.'],
+[1,'A sound pulse meets a boundary between tissues of different acoustic impedance. What can return to the probe?','A reflected echo','A newly created proton beam','Only visible light','An electric current through empty space','Part of the ultrasound reflects at an acoustic impedance boundary and returns as an echo.']]
+};
+if(COURSE.key==='physics-lab-v1')for(const [topic,rows]of Object.entries(PHYSICS_CONTEXTS))for(const [index,prompt,answer,...rest]of rows){
+ const q=findTopic(topic).questions.find(q=>q.id===topic+'-beginner-'+index),explain=rest.pop();q.versions.push({prompt,answer,options:[answer,...rest],explain,retrieval:!(/\d/.test(prompt))});
+}
+/* New short CS applications introduce a single idea at a time. */
+const CS_EASY_APPLICATIONS={
+types:['A sensor records temperatures such as 18.5. Which type is appropriate?','A program stores a measurement with a fractional part. Which data type fits?','Real','Integer','Boolean','Character','A real type represents values with fractional parts, though floating-point values may be approximate.'],
+control:['A program reads a name, builds a greeting, then displays it. Which control structure describes these steps?','Three instructions run one after another in their written order. Which structure is this?','Sequence','Recursion','Selection only','A post-condition loop','Sequence executes instructions in order.'],
+subroutines:['A subroutine saves a file but returns no result to the caller. What is it commonly called?','Which kind of subroutine performs a task without returning a value?','Procedure','Returning function','Variable','Argument','A procedure performs a task without returning a value; a function returns a value to its caller.'],
+oop:['A Car object stores its colour. What is colour in this object?','A BankAccount object stores a balance. What is this stored property called?','An attribute','A method','A constructor call','An inheritance hierarchy','Attributes store an object’s state; methods describe operations on that state.'],
+structures:['In a linked list, what tells the program where the next node is?','A list node stores a value and a link. What is the link used for?','Locating the next node','Sorting all values automatically','Storing the whole list in one character','Preventing every duplicate value','A link or pointer identifies the next node; linked nodes need not be contiguous in memory.'],
+stacks:['A program adds a new item to the top of a stack. Which operation is this?','Which stack operation places an item on top?','Push','Pop','Peek','Dequeue','Push adds to the top of a stack. Pop removes from the top.'],
+trees:['Which tree node has no parent?','At the start of a rooted tree, which node sits above all the others?','The root','Every leaf','Every child','An edge','The root is the top node of a rooted tree and has no parent.'],
+searchsort:['Cards are placed one at a time into the correct position in an already ordered hand. Which sorting idea does this model?','An algorithm inserts each next item into its correct place in a sorted prefix. Which sort is described?','Insertion sort','Binary search','Breadth-first traversal','Hashing','Insertion sort grows a sorted portion by inserting each next item in its proper position.'],
+traversals:['A depth-first search needs to remember where to backtrack. Which structure is suitable?','Which structure naturally stores unfinished branches during depth-first traversal?','A stack','Only a sorted output file','A FIFO queue only','A truth table','Depth-first search can use an explicit stack or the recursive call stack to remember pending work.'],
+computation:['An FSM finishes reading a string. What indicates that the string is accepted?','When all input has been consumed by a finite-state machine, which state makes the string valid for its language?','An accepting state','Any state with two arrows','Only an unreachable state','A state chosen at random','After the input is consumed, acceptance depends on whether the current state is designated accepting.'],
+binary:['A switch stores just off or on as 0 or 1. What is this single binary digit called?','What is one stored 0 or 1 called?','A bit','A byte','A hexadecimal word','A character set','A bit is one binary digit and has two possible values.'],
+real:['A positive floating-point result is too small in magnitude for the format to represent as a nonzero value. Which problem can occur?','A very small nonzero result rounds to zero because it is outside the format’s supported small-value range. What is this called?','Underflow','Overflow','A syntax error','A hash collision','Underflow occurs when a nonzero value is too close to zero to be represented at the available range or precision.'],
+media:['A bitmap keeps the same colour depth but stores more pixels. What happens to its uncompressed pixel-data size?','An image stores more pixels at the same bits per pixel. What happens to its raw data size?','It increases','It must decrease','It stays constant','It becomes zero','Raw bitmap size depends on the number of pixels multiplied by bits per pixel.'],
+crypto:['A message is readable before it is encrypted. What is this original form called?','What is the unencrypted input to encryption called?','Plaintext','Ciphertext','A private key','A hash salt','Plaintext is the original message; encryption transforms it into ciphertext.'],
+logic:['A sensor input is true but the required output is false. Which gate flips a single input?','Which one-input gate turns false into true and true into false?','NOT','AND','OR','XOR with no inputs','NOT produces the opposite Boolean value of its single input.'],
+architecture:['Which processor component coordinates the execution of instructions?','Which CPU component issues control signals to organise operations?','Control unit','Secondary storage','A network switch','The monitor','The control unit coordinates the fetch-decode-execute cycle using control signals.'],
+software:['A programmer writes assembly language. Which translator converts it into machine code?','Which translator turns assembly mnemonics into machine instructions?','Assembler','Link-only file copier','Web browser','Database server','An assembler translates assembly-language instructions into machine code.'],
+communications:['Several bits travel simultaneously over separate lines. Which transmission method is this?','A link uses multiple wires to transmit several bits at once. What is this called?','Parallel transmission','Serial transmission','Packet loss','Hashing','Parallel transmission sends several bits simultaneously using separate channels.'],
+internet:['A device needs an address so IP packets can be routed to its network. Which type of address is used?','Which addressing system identifies source and destination hosts for Internet Protocol packets?','IP address','Memory register address','SQL primary key','Filename extension','IP packets carry IP addresses so routers can forward them towards the destination network.'],
+security:['Software is deliberately designed to damage a system or steal information. What broad category is it?','What is the general term for software intended to carry out harmful actions?','Malware','A normal backup','A subnet mask','A pure function','Malware is malicious software; examples include viruses, ransomware and spyware.'],
+databases:['A table stores one row per pupil. What does one row normally represent?','Each row of a Customer table contains one customer’s details. What is a row called?','A record','One character','A whole database','A foreign-key constraint','A record is one row, containing related field values for one entity instance.'],
+normalisation:['A table has two different minimal sets of attributes, each able to identify a row uniquely. What are these sets called?','What is a minimal attribute set that can uniquely identify each record called?','Candidate keys','Repeating groups','Non-key dependencies','Duplicate records','A candidate key is a minimal set of attributes that uniquely identifies a row. A primary key is chosen from the candidate keys.'],
+bigdata:['A project keeps collecting more and more records. Which Big Data V describes the amount of data?','Which Big Data characteristic refers to dataset size?','Volume','Velocity','Variety','Voltage','Volume describes the quantity of data; velocity describes its rate of arrival and variety its different forms.'],
+functional:['A functional program creates a new list rather than changing the original one. Which principle does this illustrate?','A value is preserved and a transformed value is created instead of editing it in place. Which idea is illustrated?','Immutability','Destructive update','Random assignment','Global shared state','Immutable values are not modified after creation; transformations produce new values.'],
+development:['A person compares typed data with the original document to check it was copied correctly. What kind of check is this?','Double-entry compares two copies of entered data for agreement. Which process is it supporting?','Verification','Range validation only','Boundary testing only','Compilation','Verification checks accurate copying or entry. Validation checks whether data meets specified rules.'],
+ethics:['A service clearly explains what data it collects and how it will use it. Which principle does this support?','Why tell users how information about them will be used?','Transparency','Keeping data use secret','Unnecessary duplication','Removing every access control','Transparency helps people understand how a system uses their information and make informed decisions.']
+};
+if(COURSE.key==='cs-lab-v1')for(const [topic,row]of Object.entries(CS_EASY_APPLICATIONS)){
+ csSkill(topic,'easy-application',row.slice(0,2),row[2],row.slice(3,6),row[6],true);
+ const t=findTopic('cs-'+topic),q=t.questions.at(-1);q.difficulty='easy';q.beginner=true;
+ t.lessonSections.push({title:'Use the idea',points:[row[6]]});t.lesson=t.lessonSections.flatMap(s=>s.points);
+}
+// Shared question-family selection: wording variants never become separate lesson slots.
+function lessonFamilyKey(q){return q.lessonConcept||q.id;}
+function uniqueLessonSkills(list){const seen=new Set();return list.filter(q=>{const key=lessonFamilyKey(q);if(seen.has(key))return false;seen.add(key);return true;});}
+if(COURSE.key==='physics-lab-v1'){
+ const groups={planning:{0:1,1:3,2:2},analysis:{0:1,1:3,2:2},units:{0:1},uncertainty:{3:2},vectors:{0:0,3:3},forces:{1:1},materials:{0:3,3:1},momentum:{0:2,1:3},circuits:{2:3},quantum:{3:3},circular:{0:0},electric:{0:0}};
+ for(const [topic,mapping]of Object.entries(groups))for(const [old,index]of Object.entries(mapping)){const q=findTopic(topic).questions.find(q=>q.id===topic+'-'+old);q.lessonConcept=topic+'-beginner-'+index;}
+ findTopic('resistance').questions.find(q=>q.id==='resistance-ohm').lessonConcept='resistance-beginner-3';
+ const lessonPool=questionsFor;
+ questionsFor=function(t,kind=mode){
+  if(kind!=='learn')return lessonPool(t,kind);
+  const pool=fullPhysicsQuestionsFor(t,kind),round=pool.find(q=>q.type==='cloze');
+  const starters=shuffle(pool.filter(q=>q.beginner));
+  const easy=shuffle(pool.filter(q=>!q.type&&!q.beginner&&q.difficulty!=='hard'));
+  const selectedEasy=uniqueLessonSkills([...starters,...easy]).slice(0,starters.length+3);
+  const hard=shuffle(pool.filter(q=>!q.type&&q.difficulty==='hard')).slice(0,SIMPLE_PHYSICS.has(t.id)?1:2);
+  return [...selectedEasy,...(round?[{...round,difficulty:'practice'}]:[]),...hard];
+ };
+}else{
+ const lessonPool=questionsFor;
+ questionsFor=function(t,kind=mode){const list=lessonPool(t,kind);if(kind!=='learn')return list;return uniqueLessonSkills([...list.filter(q=>q.beginner),...list.filter(q=>!q.beginner)]);};
+}
+
 /* Shared session navigation, for both labs and every session mode. */
 let sidebarSession=null,sidebarOpen=true;
 function sessionIsActive(){return view==='session'&&!!session;}
@@ -2663,7 +2808,7 @@ function versionFor(skill,topicId){
   progress.variantTurns[skill.id]=turn+1;
   const prepared={id:skill.id,topic:topicId,difficulty:skill.difficulty||'practice',prompt:variant.prompt,...variant,options:variant.options?shuffle(variant.options):undefined,learn:skill.learn||''};return mode==='rush'?rushQuestion(prepared):prepared;
 }
-function begin(){if(!selected.size)return;if(mode==='rush'&&rushVariant==='suika'){Suika.start(TOPICS.filter(t=>selected.has(t.id)));return;}stopTimers();const ts=TOPICS.filter(t=>selected.has(t.id));progress.lastTopic=ts[0].id;view='session';if(mode==='exam'){session={kind:'exam',topics:ts.map(t=>t.id),index:0};examView();}else{let queue=ts.flatMap(t=>{const items=questionsFor(t).map(q=>versionFor(q,t.id));return mode==='learn'?spaceDefinitionQuestions(items):items;});if(mode==='rush')queue=shuffle(queue);session={kind:mode,queue,index:0,results:[],phase:mode==='learn'?'lesson':'question',seen:[],answered:false,choice:null,ends:Date.now()+duration*1000,seconds:duration};persist();questionView();if(mode==='rush')ticker=setInterval(tick,200);}persist();window.scrollTo(0,0);}
+function begin(){if(!selected.size)return;if(mode==='rush'&&rushVariant==='suika'){Suika.start(TOPICS.filter(t=>selected.has(t.id)));return;}stopTimers();const ts=TOPICS.filter(t=>selected.has(t.id));progress.lastTopic=ts[0].id;view='session';if(mode==='exam'){session={kind:'exam',topics:ts.map(t=>t.id),index:0};examView();}else{let queue=ts.flatMap(t=>{const items=questionsFor(t).map(q=>versionFor(q,t.id));return mode==='learn'?spaceDefinitionQuestions(items):items;});if(mode==='rush')queue=shuffle(queue);session={kind:mode,topicIds:ts.map(t=>t.id),queue,index:0,results:[],phase:mode==='learn'?'lesson':'question',seen:[],answered:false,choice:null,ends:Date.now()+duration*1000,seconds:duration};persist();questionView();if(mode==='rush')ticker=setInterval(tick,200);}persist();window.scrollTo(0,0);}
 function currentQuestion(){return session.queue[session.index];}
 function lessonView(t){
  const notes=t.lessonSections?t.lessonSections.map((section,i)=>'<section class="lesson-section"><h3>'+escapeHTML(section.title)+'</h3><ul>'+section.points.map(point=>'<li>'+escapeHTML(point)+'</li>').join('')+'</ul></section>'+lessonDiagram(t,i)).join(''):t.lesson.map(p=>'<p>'+p+'</p>').join('');
@@ -2689,7 +2834,7 @@ function revealAnswer(){
   $('#session-count').textContent=correct+' correct · '+session.results.length+' answered';
   if($('#rush-score'))$('#rush-score').textContent=correct+' correct';
 }
-function nextQuestion(){if(session?.kind==='suika'){Suika.next();return;}if(session?.kind==='rush'&&session.answered&&Date.now()<(session.advanceAt||0))return;clearTimeout(autoNext);if(!session||view!=='session'||!session.answered)return;if(session.kind==='rush'&&Date.now()>=session.ends){finish();return;}session.index++;if(session.index>=session.queue.length){finish();return;}const t=currentQuestion().topic;session.phase=session.kind==='learn'&&!session.seen.includes(t)?'lesson':'question';session.answered=false;session.choice=null;session.typedDraft='';session.reviewOpen=false;questionView();window.scrollTo(0,0);}
+function nextQuestion(){if(session?.kind==='suika'){Suika.next();return;}if(session?.kind==='rush'&&session.answered&&Date.now()<(session.advanceAt||0))return;clearTimeout(autoNext);if(!session||view!=='session'||!session.answered)return;if(session.kind==='rush'&&Date.now()>=session.ends){finish();return;}session.index++;if(session.index>=session.queue.length){if(session.kind==='rush'){const batch=refillRushQuestions();if(!batch.length){finish();return;}session.queue.push(...batch);}else{finish();return;}}const t=currentQuestion().topic;session.phase=session.kind==='learn'&&!session.seen.includes(t)?'lesson':'question';session.answered=false;session.choice=null;session.typedDraft='';session.reviewOpen=false;questionView();window.scrollTo(0,0);}
 function tick(){if(!session||session.kind!=='rush'||view!=='session')return;const cooldown=$('#rush-cooldown');if(cooldown)cooldown.textContent=Math.max(0,Math.ceil(((session.advanceAt||0)-Date.now())/1000));let seconds=Math.max(0,Math.ceil((session.ends-Date.now())/1000));let timer=$('#timer');if(timer){timer.textContent=formatTime(seconds);timer.classList.toggle('low',seconds<=15);}let track=$('#session-track');if(track)track.style.width=Math.max(0,100*(session.ends-Date.now())/(duration*1000))+'%';if(seconds<=0)finish();}
 function formatTime(s){return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;}
 function finish(){if(!session||view==='summary')return;if(session.kind==='suika'){session.game=Suika.snapshot();progress.suikaBest=Math.max(progress.suikaBest||0,session.game?.score||0);}stopTimers();if((session.kind==='exam'||session.results.length)&&!(session.kind==='suika'&&session.game?.over))Sound.play('finish');if(session.kind!=='exam'){progress.sessions++;let correct=session.results.filter(r=>r.correct).length;if(session.kind==='rush')progress.rushBest=Math.max(progress.rushBest,correct);persist();}view='summary';summaryView();window.scrollTo(0,0);}
@@ -2707,4 +2852,11 @@ document.addEventListener('input',e=>{let el=e.target;if(el.id==='search'){query
 document.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))return;if(view==='session'&&session?.kind==='suika'){if(/^[1-4]$/.test(e.key)){e.preventDefault();Suika.answer(Number(e.key)-1);}return;}if(view==='session'&&session?.kind!=='exam'&&session.phase!=='lesson'){if(/^[1-4]$/.test(e.key)){e.preventDefault();answer(Number(e.key)-1);}else if(e.key==='Enter'&&session.answered){e.preventDefault();nextQuestion();}}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick();});
 render();
+
+function refillRushQuestions(){
+ const topicIds=session.topicIds||[...new Set(session.queue.map(q=>q.topic))];
+ const skills=shuffle(TOPICS.filter(t=>topicIds.includes(t.id)).flatMap(t=>questionsFor(t,'rush').map(q=>({q,topic:t.id}))));
+ const last=session.queue.at(-1);if(skills.length>1&&skills[0].q.id===last?.id){const i=skills.findIndex(s=>s.q.id!==last.id);if(i>0)[skills[0],skills[i]]=[skills[i],skills[0]];}
+ return skills.map(({q,topic})=>versionFor(q,topic));
+}
 </script></body></html>
