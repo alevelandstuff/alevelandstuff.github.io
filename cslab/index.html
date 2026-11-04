@@ -1581,6 +1581,73 @@ if(COURSE.key==='physics-lab-v1'){
  questionsFor=function(t,kind=mode){const list=lessonPool(t,kind);if(kind!=='learn')return list;return uniqueLessonSkills([...list.filter(q=>q.beginner),...list.filter(q=>!q.beginner)]);};
 }
 
+/* Reviewed prompt/answer alignment. Variants may legitimately need different choices. */
+const QUESTION_CORRECTIONS={
+ physics:[
+ ['magnetic-beginner-2',0,null,['Tesla','Coulomb','Ohm','Farad']],
+ ['waves-beginner-1',0,null,['Maximum displacement from equilibrium','Time for one oscillation','Distance between adjacent crests','Number of oscillations per second']],
+ ['waves-beginner-1',1,'What is the name for the maximum displacement from equilibrium?'],
+ ['waves-beginner-2',0,null,['The number of complete oscillations per second','The distance travelled per second','The maximum displacement','The time taken for one oscillation']],
+ ['quantum-beginner-3',0,null,['The minimum energy needed to remove an electron from a metal surface','The energy of every photon regardless of frequency','The rate of flow of charge','The maximum kinetic energy of an emitted electron']],
+ ['quantum-beginner-3',1,'What is the name for the minimum energy needed to remove an electron from a metal surface?'],
+ ['thermal-beginner-2',0,null,['Random kinetic and potential energies','Only kinetic and nuclear energies','Only electrical and chemical energies','Power and temperature']],
+ ['circular-beginner-2',0,null,['The time for one complete revolution','The number of revolutions per second','The distance from the centre','The speed along the tangent']],
+ ['circular-beginner-2',1,'What is the time for one complete revolution called?'],
+ ['oscillations-beginner-1',0,null,['Maximum displacement from equilibrium','Time for one complete cycle','Number of cycles per second','Acceleration at equilibrium']],
+ ['oscillations-beginner-1',1,'What is the name for the greatest displacement from equilibrium?'],
+ ['oscillations-beginner-2',0,null,['The time for one complete oscillation','The number of oscillations per second','The maximum displacement','The distance travelled in one second']],
+ ['astro-beginner-1',0,null,['The total power it radiates','Its mass only','Its distance only','Its surface area only']],
+ ['momentum-beginner-2',0,'Which total quantity is conserved in an isolated system with no external resultant force?'],
+ ['resistance-beginner-2',0,null,['Energy transferred per unit charge','Charge flowing per unit time','Force per unit mass','Mass per unit volume']],
+ ],
+ cs:[
+ ['cs-control-filemode',1,'When adding to an existing log, which risk of write mode is avoided by using append mode?'],
+ ['cs-control-exception',1,'A file may be missing at runtime. What is the purpose of handling the resulting exception?'],
+ ['cs-subroutines-parameters',1,'What role do parameters play when a subroutine is called with different input values?'],
+ ['cs-oop-constructor',1,'What does running a constructor do when a new object is created?'],
+ ['cs-structures-collision',0,null,['Two different keys produce the same initial hash-table index','A key is found at its expected index','A syntax error prevents compilation','A table is sorted into ascending order']],
+ ['cs-structures-easy-application',0,'In a linked list, what is the purpose of a node’s link or pointer?'],
+ ['cs-trees-tree',0,null,['It is connected and has no cycles','Every vertex connects to every other vertex','Every vertex has exactly two children','Every edge has a different weight']],
+ ['cs-trees-bst',1,'In a binary search tree with distinct keys, which keys belong in the left subtree of a node?'],
+ ['cs-traversals-visited',0,'Which mechanism prevents a graph traversal repeatedly processing the same vertices?'],
+ ['cs-computation-abstraction',1,'A route planner ignores building colours. What does abstraction do in this example?'],
+ ['cs-computation-regex',1,'Which description best matches what a regular expression specifies?'],
+ ['cs-binary-twos',1,'How does the most significant bit allow two’s-complement integers to represent negative values?'],
+ ['cs-real-exponent',0,null,['The range of representable magnitudes','The number of mantissa bits','The precision with an unchanged mantissa','The number of characters in a string']],
+ ['cs-media-sampling',0,'What does increasing the sample rate mean for how an audio signal is recorded?'],
+ ['cs-crypto-symmetric',1,'In symmetric encryption, what do both parties use to encrypt and decrypt?'],
+ ['cs-logic-xor',1,'For a two-input XOR gate, under which input condition is its output true?'],
+ ['cs-architecture-pc',1,'What address does the program counter normally hold?'],
+ ['cs-architecture-von',0,'In the Von Neumann model, where are program instructions and data stored?'],
+ ['cs-software-os',1,'Which resource-management task is performed by an operating system?'],
+ ['cs-software-compiler',0,null,['A translator that converts source code into target code','A device that forwards packets between networks','A key that identifies a database record','A compression method that discards image detail']],
+ ['cs-software-interrupt',1,'A device needs timely CPU attention. What is the purpose of an interrupt in this situation?'],
+ ['cs-internet-dns',1,'What does DNS do when a browser needs an IP address for a domain name?'],
+ ['cs-internet-tcp',0,null,['Ordered, reliable delivery using acknowledgements and retransmission','Guaranteed zero transmission time','Automatic encryption of every application message','Replacing IP addresses with file names']],
+ ['cs-internet-port',1,'What does a port number specify so one host can distinguish network application endpoints?'],
+ ['cs-internet-http',0,null,['Retrieval of a resource representation','Deletion of the target resource','Replacement of the target resource','Creation of a new resource on every request']],
+ ['cs-security-auth',1,'After identity has been checked, what does authorisation determine?'],
+ ['cs-security-firewall',0,null,['Allows or blocks network traffic according to configured rules','Encrypts every file automatically','Guarantees that every email is safe','Repairs all programming errors']],
+ ['cs-security-least',0,null,['Giving each account only the permissions needed for its role','Giving every account administrator access','Removing all passwords','Keeping all user accounts permanently unlocked']],
+ ['cs-databases-primary',1,'What requirement prevents a primary-key value from identifying two different rows?'],
+ ['cs-databases-count',0,'Which rows contribute to COUNT(column) when some values in that column are NULL?'],
+ ['cs-normalisation-anomaly',0,'One copy of a customer’s duplicated address changes while others do not. Which problem is this?'],
+ ['cs-functional-map',1,'What does map do when given a function and a list?'],
+ ['cs-functional-filter',1,'A program uses filter to select entries satisfying a predicate. Which entries does it retain?'],
+ ['cs-functional-reduce',1,'What does a reduction over a sequence using an accumulator normally produce?'],
+ ['cs-functional-higher',1,'Which description fits a function that accepts another function as an argument?'],
+ ['cs-functional-partial',0,null,['Fixing some arguments to create a function expecting the remaining arguments','Running half a program and deleting the rest','Leaving every function argument unspecified forever','Changing a function into a syntax error']],
+ ['cs-development-expected',0,'What should be specified before running a test so the actual result can be checked against it?'],
+ ['cs-ethics-minimise',0,'Which data-collection practice reduces unnecessary privacy exposure?'],
+ ['cs-ethics-accessibility',1,'Which user differences should a designer consider when offering alternatives to colour-only feedback?'],
+ ['cs-ethics-easy-application',1,'Which principle is supported by explaining to users how their information will be used?']
+ ]
+};
+for(const [id,index,prompt,options]of QUESTION_CORRECTIONS[COURSE.key==='cs-lab-v1'?'cs':'physics']){
+ const q=TOPICS.flatMap(t=>t.questions).find(q=>q.id===id);if(!q?.versions?.[index])throw Error('Missing corrected question '+id+' variant '+index);
+ const v={...q.versions[index]};if(prompt)v.prompt=prompt;if(options){v.options=[...options];v.answer=options[0];}q.versions[index]=v;if(index===0)Object.assign(q,v);
+}
+
 /* Shared session navigation, for both labs and every session mode. */
 let sidebarSession=null,sidebarOpen=true;
 function sessionIsActive(){return view==='session'&&!!session;}
