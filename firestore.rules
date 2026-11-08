@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Each signed-in person can only read and write their own progress.
+    match /users/{uid}/labs/{lab} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['progress', 'updatedAt'])
+        && request.resource.data.progress is string
+        && request.resource.data.progress.size() < 900000;
+    }
+  }
+}
