@@ -9,8 +9,10 @@
  * See README.md for the full setup steps.
  */
 window.FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDNT8xP4VfK2vwElpFECw9XBKxKl0L_9UA",
+  authDomain: "alevelandstuff.firebaseapp.com",
+  projectId: "alevelandstuff",
+  storageBucket: "alevelandstuff.firebasestorage.app",
+  messagingSenderId: "432575801090",
+  appId: "1:432575801090:web:8aa867e37321177dc8041b"
 };
