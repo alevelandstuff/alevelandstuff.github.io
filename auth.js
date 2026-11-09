@@ -9,11 +9,10 @@
  */
 const Account=(()=>{
  const SDK='https://www.gstatic.com/firebasejs/10.14.1/';
- const SEEN_KEY='alas-account-used';
  const LABS={'/physicslab':'Physics Lab','/cslab':'CS Lab'};
  const config=window.FIREBASE_CONFIG||{};
  const configured=Boolean(config.apiKey&&config.projectId&&!/^YOUR_/.test(config.apiKey)&&!/^YOUR_/.test(config.projectId));
- let auth=null,db=null,user=null,options={},tab=null,busy=false,error='';
+ let auth=null,db=null,user=null,options={},busy=false,error='';
  let pending=null,timer=null,lastSaved=null,signingOut=false;
 
  const app=()=>document.getElementById('app');
@@ -21,8 +20,6 @@ const Account=(()=>{
  const brand='<span class="lab-home-brand">a level<span>&amp;</span>stuff.</span>';
  const googleLogo='<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
 
- function seenBefore(){try{return localStorage.getItem(SEEN_KEY)==='1';}catch{return false;}}
- function markSeen(){try{localStorage.setItem(SEEN_KEY,'1');}catch{}}
  function nextLab(){
   const next=new URLSearchParams(location.search).get('next')||'';
   const path=next.replace(/\/+$/,'');
@@ -64,25 +61,20 @@ const Account=(()=>{
  }
  function showGate(){
   injectStyles();
-  tab=tab||(seenBefore()?'login':'signup');
-  const signup=tab==='signup',next=nextLab(),disabled=busy||!configured||!auth;
-  document.title='A level & stuff — '+(signup?'Sign up':'Log in');
-  const tabButton=(id,label)=>'<button type="button" role="tab" id="account-tab-'+id+'" aria-controls="account-panel" aria-selected="'+(tab===id)+'" tabindex="'+(tab===id?0:-1)+'" data-account-tab="'+id+'">'+label+'</button>';
+  const next=nextLab(),disabled=busy||!configured||!auth;
+  document.title='A level & stuff — Log in';
   app().innerHTML='<main class="lab-home account-gate"><header class="lab-home-header">'+brand+'</header>'+
    '<section class="lab-home-content account-content" aria-labelledby="account-title"><div class="account-card">'+
    '<div class="eyebrow">YOUR REVISION SPACE</div>'+
-   '<h1 id="account-title">'+(signup?'Create your account.':'Welcome back.')+'</h1>'+
-   '<p class="account-lead">'+(next?'Sign in to open '+LABS[next.slice(0,-1)]+'.':signup?'Sign up to start revising. Your progress is saved to your account.':'Log in to pick up where you left off.')+'</p>'+
-   '<div class="account-tabs" role="tablist" aria-label="Account">'+tabButton('login','Log in')+tabButton('signup','Sign up')+'</div>'+
-   '<div class="account-panel" id="account-panel" role="tabpanel" aria-labelledby="account-tab-'+tab+'">'+
-   (signup?'<ul class="account-points"><li>Your progress follows you to any device.</li><li>Free — use the Google account you already have.</li><li>Only your name, email and revision progress are stored.</li></ul>':'<ul class="account-points"><li>Every lab’s progress, exam drafts and best scores.</li><li>Synced across your phone, laptop and school computers.</li></ul>')+
-   '<button type="button" class="account-google" data-account-signin '+(disabled?'disabled':'')+'>'+googleLogo+'<span>'+(busy?'Waiting for Google…':signup?'Sign up with Google':'Log in with Google')+'</span></button>'+
+   '<h1 id="account-title">Log in to start revising.</h1>'+
+   '<p class="account-lead">'+(next?'Log in to open '+LABS[next.slice(0,-1)]+'.':'Your progress is saved to your account and follows you to any device.')+'</p>'+
+   '<ul class="account-points"><li>Every lab’s progress, exam drafts and best scores.</li><li>Only your name, email and revision progress are stored.</li></ul>'+
+   '<button type="button" class="account-google" data-account-signin '+(disabled?'disabled':'')+'>'+googleLogo+'<span>'+(busy?'Waiting for Google…':'Log in with Google')+'</span></button>'+
    '<p class="account-error" role="alert">'+esc(error)+'</p>'+
-   '<p class="account-switch">'+(signup?'Already have an account? <button type="button" data-account-tab="login">Log in</button>':'New here? <button type="button" data-account-tab="signup">Create an account</button>')+'</p>'+
-   '</div></div></section>'+
-   '<footer class="lab-home-footer">Progress saved in this browser before accounts existed moves into your account the first time you sign in here.</footer></main>';
+   '<p class="account-note">First time here? Your account is created automatically.</p>'+
+   '</div></section>'+
+   '<footer class="lab-home-footer">Progress saved in this browser before accounts existed moves into your account the first time you log in here.</footer></main>';
  }
- function setTab(id){if(id===tab)return;tab=id;error='';showGate();document.getElementById('account-tab-'+id)?.focus();}
 
  /* ---------- Sign in / out ---------- */
  async function signIn(){
@@ -92,7 +84,6 @@ const Account=(()=>{
   provider.setCustomParameters({prompt:'select_account'});
   try{
    await auth.signInWithPopup(provider);
-   markSeen();
   }catch(err){
    if(err?.code==='auth/popup-blocked'){try{await auth.signInWithRedirect(provider);return;}catch(redirectError){err=redirectError;}}
    busy=false;error=errorMessage(err);
@@ -148,7 +139,7 @@ const Account=(()=>{
    else location.replace(signingOut?'/':'/?next='+encodeURIComponent(location.pathname));
    return;
   }
-  markSeen();error='';signingOut=false;
+  error='';signingOut=false;
   const next=nextLab();
   if(options.home&&next){location.replace(next);return;}
   splash('Loading your progress…');
@@ -181,16 +172,11 @@ const Account=(()=>{
  }
 
  document.addEventListener('click',event=>{
-  const el=event.target.closest?.('[data-account-signin],[data-account-signout],[data-account-tab],[data-account-retry]');
+  const el=event.target.closest?.('[data-account-signin],[data-account-signout],[data-account-retry]');
   if(!el||el.disabled)return;
-  if(el.dataset.accountTab)setTab(el.dataset.accountTab);
-  else if(el.hasAttribute('data-account-signin'))signIn();
+  if(el.hasAttribute('data-account-signin'))signIn();
   else if(el.hasAttribute('data-account-signout'))signOut();
   else if(el.hasAttribute('data-account-retry'))handleUser(user);
- });
- document.addEventListener('keydown',event=>{
-  if(!event.target.matches?.('[role=tab][data-account-tab]')||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
-  event.preventDefault();setTab(tab==='login'?'signup':'login');
  });
  document.addEventListener('visibilitychange',()=>{if(document.hidden)flush();});
  window.addEventListener('pagehide',flush);
@@ -210,9 +196,6 @@ const Account=(()=>{
 .account-card{width:100%;background:#fff;border:1px solid var(--line,#e0e6df);border-radius:22px;padding:34px 32px 26px;box-shadow:0 18px 50px #183e3712}
 .account-card h1{font-size:clamp(30px,4.5vw,40px);line-height:1.15;letter-spacing:-1.2px;margin:8px 0 10px}
 .account-lead{font-size:14.5px;color:#748271;line-height:1.6;margin:0 0 22px}
-.account-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#f1f4ec;border-radius:12px;padding:4px;margin-bottom:20px}
-.account-tabs button{border:0;background:transparent;padding:9px;border-radius:9px;font:inherit;font-size:13px;font-weight:600;color:var(--muted,#697873);cursor:pointer;transition:background .2s,color .2s}
-.account-tabs button[aria-selected=true]{background:#fff;color:var(--ink,#1e302d);box-shadow:0 1px 4px #0000001c}
 .account-points{list-style:none;padding:0;margin:0 0 22px;display:grid;gap:9px;font-size:13.5px;color:var(--ink,#1e302d)}
 .account-points li{position:relative;padding-left:26px;line-height:1.5}
 .account-points li::before{content:'✓';position:absolute;left:0;top:1px;width:18px;height:18px;border-radius:50%;background:var(--lime,#d5ef9a);color:var(--green,#145c4c);font-size:11px;font-weight:800;display:grid;place-items:center}
@@ -221,11 +204,10 @@ const Account=(()=>{
 .account-google:hover:not(:disabled){background:#f6f8f3;border-color:#9fb091}
 .account-google:active:not(:disabled){transform:scale(.98)}
 .account-google:disabled{opacity:.55;cursor:not-allowed}
-.account-google:focus-visible,.account-tabs button:focus-visible,.account-switch button:focus-visible,.account-signout:focus-visible{outline:3px solid #94b97b;outline-offset:2px}
+.account-google:focus-visible,.account-signout:focus-visible{outline:3px solid #94b97b;outline-offset:2px}
+.account-note{margin:18px 0 0;font-size:13px;color:var(--muted,#697873);text-align:center}
 .account-error{min-height:0;margin:10px 0 0;font-size:13px;color:var(--red,#b2443f);line-height:1.5}
 .account-error:empty{display:none}
-.account-switch{margin:18px 0 0;font-size:13px;color:var(--muted,#697873);text-align:center}
-.account-switch button{border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--green,#145c4c);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .account-actions{display:flex;align-items:center;gap:10px}
 .account-chip{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink,#1e302d);min-width:0}
 .account-avatar{width:30px;height:30px;border-radius:50%;overflow:hidden;flex-shrink:0;display:grid;place-items:center;background:var(--lime,#d5ef9a);color:var(--green,#145c4c);font-weight:800;font-size:13px}
@@ -234,7 +216,7 @@ const Account=(()=>{
 .account-signout{border:1px solid var(--line,#e0e6df);background:#fff;color:var(--muted,#697873);border-radius:10px;padding:6px 10px;font:inherit;font-size:11px;cursor:pointer;white-space:nowrap}
 .account-signout:hover{color:var(--ink,#1e302d);border-color:#b4c5a7}
 @media(max-width:760px){.account-name{display:none}.account-card{padding:28px 20px 22px;border-radius:18px}.account-content{padding-top:24px}}
-@media(prefers-reduced-motion:reduce){.account-spinner{animation:none}.account-google,.account-tabs button{transition:none}}
+@media(prefers-reduced-motion:reduce){.account-spinner{animation:none}.account-google{transition:none}}
 `;
   document.head.append(style);
  }
