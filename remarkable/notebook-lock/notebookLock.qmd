@@ -1,0 +1,390 @@
+; =============================================================================
+;  Notebook Lock - a XOVI / qt-resource-rebuilder UI mod for reMarkable 2
+; -----------------------------------------------------------------------------
+;  * Long-press a notebook in My Files -> "..." (More) -> "Lock".
+;  * Locked notebooks show a blank cover with a padlock (grid, list, search,
+;    and the Recent/Favorites drawer) and the caption "Locked".
+;  * Opening a locked notebook asks for the password first.
+;  * Select a locked notebook -> "..." -> "Unlock" (asks for the password too)
+;    to remove the lock.
+;
+;  This is a UI lock only. Nothing is encrypted; the files on disk, the
+;  desktop/mobile apps and the cloud still show everything.
+;
+;  Built against xochitl 3.28.0.172 (reMarkable 2). The file paths and object
+;  ids come from that firmware and may move in other versions.
+;
+;  The locked list is stored in /home/root/.config/remarkable/notebook-lock.conf
+;  (one comma-separated list of document UUIDs).
+; =============================================================================
+
+
+; -----------------------------------------------------------------------------
+;  1. Shared state: password, locked list, helper functions.
+;     `Values` is a singleton imported by almost every library file as `common`.
+; -----------------------------------------------------------------------------
+AFFECT /qml/common/Values.qml
+    IMPORT QtCore 6.5 NlCore
+
+    TRAVERSE Item
+        LOCATE AFTER ALL
+        INSERT {
+            readonly property string nlPassword: "carmelite4"
+
+            // Set by the unlock window each time it opens, so the password
+            // dialog knows whether it is checking our password or a PDF one.
+            property bool nlDialogMode: false
+
+            NlCore.Settings {
+                id: nlSettings
+                location: "file:///home/root/.config/remarkable/notebook-lock.conf"
+                category: "NotebookLock"
+                property string lockedIds: ""
+            }
+
+            // UUID -> true, rebuilt whenever the stored list changes.
+            readonly property var nlLockedKeys: {
+                const map = {};
+                const parts = nlSettings.lockedIds.split(",");
+                for (let i = 0; i < parts.length; i++) {
+                    if (parts[i].length > 0) {
+                        map[parts[i]] = true;
+                    }
+                }
+                return map;
+            }
+
+            // Library items use "entity ids" and the document opener uses plain
+            // document ids. Both contain the document UUID, so that is the key.
+            function nlKey(id) {
+                if (id === undefined || id === null) {
+                    return "";
+                }
+                const text = String(id);
+                const uuid = new RegExp("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+                const match = uuid.exec(text);
+                return (match ? match[0] : text).toLowerCase();
+            }
+
+            function nlIsLocked(id) {
+                const key = nlKey(id);
+                return key.length > 0 && nlLockedKeys[key] === true;
+            }
+
+            function nlSetLocked(id, locked) {
+                const key = nlKey(id);
+                if (key.length === 0) {
+                    return;
+                }
+                const map = Object.assign({}, nlLockedKeys);
+                if (locked) {
+                    map[key] = true;
+                } else {
+                    delete map[key];
+                }
+                nlSettings.lockedIds = Object.keys(map).join(",");
+                nlSettings.sync();
+            }
+
+            function nlCheckPassword(text) {
+                return text === nlPassword;
+            }
+        }
+    END TRAVERSE
+END AFFECT
+
+
+; -----------------------------------------------------------------------------
+;  2. Block opening. Every route that opens a document (library, search,
+;     Recent drawer, links, "open last document") goes through
+;     MainView.openDocument_helper - the same place the stock firmware asks
+;     for a PDF password.
+; -----------------------------------------------------------------------------
+AFFECT /qml/device/view/main/MainView.qml
+    TRAVERSE Background#root
+        RENAME openDocument_helper TO nlOriginalOpenDocumentHelper
+        INSERT {
+            function openDocument_helper(entry, openCall) {
+                // If the document view is still loading, the original helper
+                // saves the request and calls openDocument_helper again later,
+                // so we only ask once, when the document really opens.
+                if (entry && documentView.status === Loader.Ready && Values.nlIsLocked(entry.id)) {
+                    root.windowNavigator.open("document/window/unlock", {
+                        documentToUnlock: Values.nlKey(entry.id),
+                        notebookLock: true,
+                        action: function(password) {
+                            root.nlOriginalOpenDocumentHelper(entry, openCall);
+                        }
+                    });
+                    return;
+                }
+                root.nlOriginalOpenDocumentHelper(entry, openCall);
+            }
+        }
+    END TRAVERSE
+END AFFECT
+
+
+; -----------------------------------------------------------------------------
+;  3. Reuse the stock "Password protected PDF" screen (with its on-screen
+;     keyboard) as the notebook password prompt.
+; -----------------------------------------------------------------------------
+AFFECT /qt/qml/xofm/modules/document/qml/UnlockWindow.qml
+    TRAVERSE BaseView#root
+        REBUILD onOpened
+            LOCATE AFTER { loader.acceptAction = action; }
+            INSERT { Values.nlDialogMode = args.notebookLock === true; }
+        END REBUILD
+    END TRAVERSE
+END AFFECT
+
+AFFECT /qt/qml/xofm/modules/document/qml/PasswordEntryDialog.qml
+    TRAVERSE FocusScope#root
+        LOCATE BEFORE ALL
+        INSERT {
+            readonly property bool notebookLock: Values.nlDialogMode
+        }
+
+        RENAME acceptInput TO nlNativeAcceptInput
+        INSERT {
+            function acceptInput(text) {
+                if (!root.notebookLock) {
+                    root.nlNativeAcceptInput(text);
+                    return;
+                }
+                if (Values.nlCheckPassword(text)) {
+                    root.invalidPassword = false;
+                    if (root.acceptAction) {
+                        root.acceptAction(text);
+                    }
+                    root.closeDialog();
+                } else {
+                    root.invalidPassword = true;
+                }
+            }
+        }
+
+        ; The PDF "loading succeeded" signal must not fire our callback a
+        ; second time when the notebook finishes opening.
+        TRAVERSE Connections
+            LOCATE BEFORE ALL
+            INSERT { enabled: !root.notebookLock }
+        END TRAVERSE
+
+        TRAVERSE Header#inputHeader
+            REBUILD text
+                LOCATE BEFORE ALL
+                INSERT { root.notebookLock ? qsTr("Locked notebook") : }
+            END REBUILD
+        END TRAVERSE
+    END TRAVERSE
+END AFFECT
+
+
+; -----------------------------------------------------------------------------
+;  4. Blank thumbnails in My Files (grid + list views, also used by search).
+;     The stock items already blank the cover for password-protected PDFs, so
+;     we widen that check to "PDF password OR locked by this mod".
+; -----------------------------------------------------------------------------
+AFFECT /qml/device/view/syncserviceexplorer/ContentItemBase.qml
+    TRAVERSE MouseArea#baseItem
+        LOCATE AFTER ALL
+        INSERT {
+            readonly property bool nlLocked: { return baseItem.type !== Entity.Type.Folder && Values.nlIsLocked(baseItem.entityId); }
+            readonly property bool nlHidden: baseItem.passwordProtected || baseItem.nlLocked
+        }
+    END TRAVERSE
+END AFFECT
+
+AFFECT /qml/device/view/syncserviceexplorer/ContentGridItem.qml
+    TRAVERSE ContentItemBase#gridItem
+        TRAVERSE ?#_image
+            REBUILD source
+                LOCATE BEFORE ALL
+                REPLACE { passwordProtected } WITH { gridItem.nlHidden }
+            END REBUILD
+        END TRAVERSE
+
+        TRAVERSE ?#icon
+            REBUILD source
+                LOCATE BEFORE ALL
+                REPLACE { gridItem.passwordProtected } WITH { gridItem.nlHidden }
+            END REBUILD
+        END TRAVERSE
+
+        TRAVERSE ?#_infoText
+            REBUILD visible
+                LOCATE BEFORE ALL
+                REPLACE { gridItem.passwordProtected } WITH { gridItem.nlHidden }
+            END REBUILD
+            REBUILD text
+                LOCATE BEFORE ALL
+                INSERT { gridItem.nlLocked ? qsTr("Locked") : }
+            END REBUILD
+        END TRAVERSE
+    END TRAVERSE
+END AFFECT
+
+AFFECT /qml/device/view/syncserviceexplorer/ContentListItem.qml
+    TRAVERSE ContentItemBase#listItem
+        TRAVERSE ?#thumbnailImage
+            REBUILD source
+                LOCATE BEFORE ALL
+                REPLACE { listItem.passwordProtected } WITH { listItem.nlHidden }
+            END REBUILD
+        END TRAVERSE
+
+        TRAVERSE ?[.objectName="\"thumbnailIcon\""]
+            REBUILD source
+                LOCATE BEFORE ALL
+                REPLACE { listItem.passwordProtected } WITH { listItem.nlHidden }
+            END REBUILD
+        END TRAVERSE
+    END TRAVERSE
+END AFFECT
+
+
+; -----------------------------------------------------------------------------
+;  5. Blank thumbnails in the Recent / Favorites document drawer.
+; -----------------------------------------------------------------------------
+AFFECT /qml/device/view/navigator/ContentEntriesGridItem.qml
+    TRAVERSE MouseArea#gridItem
+        REPLACE lockedByPassword WITH {
+            readonly property bool lockedByPassword: { return entry ? (entry.lockedByPassword || Values.nlIsLocked(entry.id)) : false; }
+        }
+
+        TRAVERSE ?#icon
+            REBUILD source
+                LOCATE BEFORE ALL
+                REPLACE { entry.lockedByPassword } WITH { gridItem.lockedByPassword }
+            END REBUILD
+        END TRAVERSE
+
+        TRAVERSE ?#_image
+            REBUILD documentId
+                LOCATE BEFORE ALL
+                INSERT { gridItem.lockedByPassword ? "" : }
+            END REBUILD
+        END TRAVERSE
+    END TRAVERSE
+END AFFECT
+
+
+; -----------------------------------------------------------------------------
+;  6. "Lock" / "Unlock" entry in the selection "..." (More) menu.
+; -----------------------------------------------------------------------------
+AFFECT /qml/device/view/navigator/MyFilesMoreFoldout.qml
+    TRAVERSE FoldoutOverlay#root
+        LOCATE BEFORE ALL
+        INSERT {
+            property string nlLockLabel: qsTr("Lock")
+            property bool nlLockVisible: false
+            signal nlLockClicked
+        }
+
+        TRAVERSE ColumnLayout
+            LOCATE BEFORE ALL
+            INSERT {
+                ArkControls.FoldoutItem {
+                    id: nlLockFoldoutItem
+                    objectName: "nlLockFoldoutItem"
+                    Layout.fillWidth: true
+                    visible: root.nlLockVisible
+                    label: root.nlLockLabel
+                    iconSource: "qrc:/ark/icons/padlock"
+                    onClicked: root.nlLockClicked()
+                }
+            }
+        END TRAVERSE
+    END TRAVERSE
+END AFFECT
+
+AFFECT /qml/device/view/navigator/ActionHeader.qml
+    TRAVERSE HeaderContainer#actionHeader
+        LOCATE AFTER ALL
+        INSERT {
+            // Converts a selection EntityId to text the same way the library
+            // items do (by assigning it to a string property).
+            QtObject {
+                id: nlIdConverter
+                property string value: ""
+            }
+
+            function nlKeyFor(id) {
+                try {
+                    nlIdConverter.value = id;
+                } catch (error) {
+                    nlIdConverter.value = String(id);
+                }
+                return Values.nlKey(nlIdConverter.value);
+            }
+
+            function nlSelectedKeys() {
+                const ids = actionHeader.selection.selectedIds;
+                const keys = [];
+                for (let i = 0; i < ids.length; i++) {
+                    const key = actionHeader.nlKeyFor(ids[i]);
+                    if (key.length > 0) {
+                        keys.push(key);
+                    }
+                }
+                return keys;
+            }
+
+            function nlSelectionIsAllLocked() {
+                const keys = actionHeader.nlSelectedKeys();
+                if (keys.length === 0) {
+                    return false;
+                }
+                for (let i = 0; i < keys.length; i++) {
+                    if (!Values.nlIsLocked(keys[i])) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            function nlToggleLockSelection() {
+                const keys = actionHeader.nlSelectedKeys();
+                if (keys.length === 0) {
+                    actionHeader.cancel();
+                    return;
+                }
+
+                if (actionHeader.nlSelectionIsAllLocked()) {
+                    // Removing a lock needs the password as well.
+                    actionHeader.windowNavigator.open("document/window/unlock", {
+                        documentToUnlock: keys[0],
+                        notebookLock: true,
+                        action: function(password) {
+                            for (let i = 0; i < keys.length; i++) {
+                                Values.nlSetLocked(keys[i], false);
+                            }
+                        }
+                    });
+                } else {
+                    for (let i = 0; i < keys.length; i++) {
+                        Values.nlSetLocked(keys[i], true);
+                    }
+                    actionHeader.notificationQueue.enqueue({
+                        "text": qsTr("Locked"),
+                        "icon": "qrc:/ark/icons/padlock",
+                        "timeout": 2000
+                    });
+                }
+                actionHeader.cancel();
+            }
+        }
+
+        TRAVERSE Component#moreFoldout > MyFilesMoreFoldout
+            LOCATE AFTER ALL
+            INSERT {
+                nlLockVisible: !actionHeader.selection.hasFolder && !actionHeader.selection.hasPage
+                onNlLockClicked: actionHeader.nlToggleLockSelection()
+                Component.onCompleted: {
+                    nlLockLabel = actionHeader.nlSelectionIsAllLocked() ? qsTr("Unlock") : qsTr("Lock");
+                }
+            }
+        END TRAVERSE
+    END TRAVERSE
+END AFFECT
