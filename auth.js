@@ -6,6 +6,11 @@
  * Each lab page calls Account.start(...) once its code has loaded. Signed-out
  * visitors see the sign up / log in screen on the home page; lab pages send
  * them there first and return them to the lab after they sign in.
+ *
+ * Demo mode lets visitors try the labs without an account. Progress is kept in
+ * memory only: nothing is written to the browser or the cloud, so it resets
+ * when the page is left or refreshed. Only an on/off flag is kept in
+ * sessionStorage so the choice lasts while moving between pages in that tab.
  */
 const Account=(()=>{
  const SDK='https://www.gstatic.com/firebasejs/10.14.1/';
@@ -14,6 +19,9 @@ const Account=(()=>{
  const configured=Boolean(config.apiKey&&config.projectId&&!/^YOUR_/.test(config.apiKey)&&!/^YOUR_/.test(config.projectId));
  let auth=null,db=null,user=null,options={},busy=false,error='';
  let pending=null,timer=null,lastSaved=null,signingOut=false;
+ const DEMO_FLAG='alevelandstuff-demo';
+ let demo=false;
+ try{demo=sessionStorage.getItem(DEMO_FLAG)==='1';}catch{}
 
  const app=()=>document.getElementById('app');
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -72,6 +80,9 @@ const Account=(()=>{
    '<button type="button" class="account-google" data-account-signin '+(disabled?'disabled':'')+'>'+googleLogo+'<span>'+(busy?'Waiting for Google…':'Log in with Google')+'</span></button>'+
    '<p class="account-error" role="alert">'+esc(error)+'</p>'+
    '<p class="account-note">First time here? Your account is created automatically.</p>'+
+   '<div class="account-divider" aria-hidden="true"><span>or</span></div>'+
+   '<button type="button" class="account-demo" data-account-demo '+(busy?'disabled':'')+'>Try demo mode</button>'+
+   '<p class="account-note">No account needed. Nothing is saved, so progress resets when you leave or refresh the page.</p>'+
    '</div></section>'+
    '<footer class="lab-home-footer">Progress saved in this browser before accounts existed moves into your account the first time you log in here.</footer></main>';
  }
@@ -91,12 +102,30 @@ const Account=(()=>{
   }
  }
  async function signOut(){
+  if(demo){exitDemo();return;}
   if(!auth||(options.beforeSignOut&&!options.beforeSignOut()))return;
   // Give queued progress a moment to reach the server before the session ends.
   await Promise.race([flush(),new Promise(r=>setTimeout(r,2500))]).catch(()=>{});
   options.onSignOut?.();
   signingOut=true;
   await auth.signOut();
+ }
+
+ /* ---------- Demo mode ---------- */
+ function startDemo(){
+  demo=true;error='';busy=false;
+  injectStyles();
+  try{sessionStorage.setItem(DEMO_FLAG,'1');}catch{}
+  const next=nextLab();
+  if(options.home&&next){location.replace(next);return;}
+  options.onReady?.(null,null);
+ }
+ function exitDemo(){
+  if(options.beforeSignOut&&!options.beforeSignOut())return;
+  options.onSignOut?.();
+  demo=false;
+  try{sessionStorage.removeItem(DEMO_FLAG);}catch{}
+  location.href='/';
  }
 
  /* ---------- Progress storage ---------- */
@@ -118,12 +147,12 @@ const Account=(()=>{
   return data;
  }
  function save(data){
-  if(!user||!db)return;
+  if(demo||!user||!db)return;
   pending=data;clearTimeout(timer);timer=setTimeout(flush,800);
  }
  function flush(){
   clearTimeout(timer);timer=null;
-  if(!pending||!user||!db)return Promise.resolve();
+  if(demo||!pending||!user||!db)return Promise.resolve();
   const json=JSON.stringify(pending);pending=null;
   if(json===lastSaved)return Promise.resolve();
   lastSaved=json;
@@ -132,6 +161,7 @@ const Account=(()=>{
 
  /* ---------- Lifecycle ---------- */
  async function handleUser(signedIn){
+  if(demo)return;
   user=signedIn;busy=false;
   if(!user){
    pending=null;lastSaved=null;
@@ -154,6 +184,7 @@ const Account=(()=>{
  }
  function start(settings){
   options=settings||{};
+  if(demo){startDemo();return;}
   splash('Loading your account…');
   init().then(()=>{
    auth.getRedirectResult().catch(err=>{error=errorMessage(err);if(!user&&options.home)showGate();});
@@ -165,6 +196,7 @@ const Account=(()=>{
   });
  }
  function markup(){
+  if(demo)return '<div class="account-chip" title="Demo mode: progress isn’t saved"><span class="account-demo-badge">Demo</span><button type="button" class="account-signout" data-account-signout aria-label="Exit demo mode and go to log in">Exit demo</button></div>';
   if(!user)return '';
   const name=user.displayName||user.email||'Account',first=name.split(/\s+/)[0];
   const avatar=user.photoURL?'<img src="'+esc(user.photoURL)+'" alt="" referrerpolicy="no-referrer">':'<span>'+esc(first.charAt(0).toUpperCase())+'</span>';
@@ -172,9 +204,10 @@ const Account=(()=>{
  }
 
  document.addEventListener('click',event=>{
-  const el=event.target.closest?.('[data-account-signin],[data-account-signout],[data-account-retry]');
+  const el=event.target.closest?.('[data-account-signin],[data-account-signout],[data-account-retry],[data-account-demo]');
   if(!el||el.disabled)return;
   if(el.hasAttribute('data-account-signin'))signIn();
+  else if(el.hasAttribute('data-account-demo'))startDemo();
   else if(el.hasAttribute('data-account-signout'))signOut();
   else if(el.hasAttribute('data-account-retry'))handleUser(user);
  });
@@ -204,7 +237,15 @@ const Account=(()=>{
 .account-google:hover:not(:disabled){background:#f6f8f3;border-color:#9fb091}
 .account-google:active:not(:disabled){transform:scale(.98)}
 .account-google:disabled{opacity:.55;cursor:not-allowed}
-.account-google:focus-visible,.account-signout:focus-visible{outline:3px solid #94b97b;outline-offset:2px}
+.account-divider{display:flex;align-items:center;gap:12px;margin:20px 0 16px;font-size:12px;color:var(--muted,#697873);text-transform:uppercase;letter-spacing:1px}
+.account-divider::before,.account-divider::after{content:'';flex:1;height:1px;background:var(--line,#e0e6df)}
+.account-demo{width:100%;border:1px dashed #b4c5a7;background:transparent;color:var(--green,#145c4c);border-radius:12px;padding:11px 16px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:background .2s,border-color .2s,transform .15s}
+.account-demo:hover:not(:disabled){background:#f6f8f3;border-color:#94b97b}
+.account-demo:active:not(:disabled){transform:scale(.98)}
+.account-demo:disabled{opacity:.55;cursor:not-allowed}
+.account-demo + .account-note{margin-top:10px;font-size:12.5px}
+.account-demo-badge{border-radius:999px;padding:4px 9px;background:var(--lime,#d5ef9a);color:var(--green,#145c4c);font-weight:700;font-size:11px;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap}
+.account-google:focus-visible,.account-signout:focus-visible,.account-demo:focus-visible{outline:3px solid #94b97b;outline-offset:2px}
 .account-note{margin:18px 0 0;font-size:13px;color:var(--muted,#697873);text-align:center}
 .account-error{min-height:0;margin:10px 0 0;font-size:13px;color:var(--red,#b2443f);line-height:1.5}
 .account-error:empty{display:none}
@@ -216,10 +257,10 @@ const Account=(()=>{
 .account-signout{border:1px solid var(--line,#e0e6df);background:#fff;color:var(--muted,#697873);border-radius:10px;padding:6px 10px;font:inherit;font-size:11px;cursor:pointer;white-space:nowrap}
 .account-signout:hover{color:var(--ink,#1e302d);border-color:#b4c5a7}
 @media(max-width:760px){.account-name{display:none}.account-card{padding:28px 20px 22px;border-radius:18px}.account-content{padding-top:24px}}
-@media(prefers-reduced-motion:reduce){.account-spinner{animation:none}.account-google{transition:none}}
+@media(prefers-reduced-motion:reduce){.account-spinner{animation:none}.account-google,.account-demo{transition:none}}
 `;
   document.head.append(style);
  }
 
- return {start,save,flush,markup,signOut,get user(){return user;}};
+ return {start,save,flush,markup,signOut,get user(){return user;},get demo(){return demo;}};
 })();
